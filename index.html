@@ -1,1 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>文舞集 | 現場 NFC 簽到系統</title>
+  <style>
+    /* ==========================================
+       1. 基礎核心與極簡深色主題 Variable
+       ========================================== */
+    :root {
+      --bg-dark: #0a0e17;
+      --card-bg: rgba(22, 30, 46, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary-cyan: #00f2fe;
+      --primary-blue: #4facfe;
+      --accent-green: #00e676;
+      --accent-red: #ff5252;
+      --accent-orange: #ff9100;
+      --accent-purple: #7c4dff;
+      --text-main: #f0f6fc;
+      --text-sub: #8b949e;
+      --radius-lg: 16px;
+      --radius-md: 10px;
+    }
 
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; padding: 16px; overflow-x: hidden; }
+
+    /* ==========================================
+       2. 頂部 Bar & 當日課程切換區
+       ========================================== */
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .brand-title { font-size: 1.4rem; font-weight: 800; background: linear-gradient(135deg, var(--primary-cyan), var(--primary-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 1px; }
+    .nfc-badge { font-size: 0.8rem; padding: 4px 10px; border-radius: 20px; background: rgba(0, 242, 254, 0.1); color: var(--primary-cyan); border: 1px solid rgba(0, 242, 254, 0.3); display: flex; align-items: center; gap: 6px; }
+    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); animation: pulse 1.5s infinite; }
+    
+    @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+
+    /* 當日課程切換卡片 */
+    .course-section { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius-lg); padding: 14px; margin-bottom: 16px; backdrop-filter: blur(10px); }
+    .section-title { font-size: 0.85rem; color: var(--text-sub); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+    .course-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+    .course-item { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s; }
+    .course-item.active { border-color: var(--primary-cyan); background: rgba(0, 242, 254, 0.08); box-shadow: 0 0 12px rgba(0, 242, 254, 0.15); }
+    .course-name { font-size: 0.95rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .course-teacher { font-size: 0.75rem; color: var(--text-sub); }
+
+    /* Switch 開關 */
+    .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #2a3547; transition: .3s; border-radius: 22px; }
+    .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--primary-cyan); }
+    input:checked + .slider:before { transform: translateX(18px); }
+
+    /* ==========================================
+       3. 主感應與狀態顯示視窗 (#displayWindow)
+       ========================================== */
+    .display-window { flex: 1; min-height: 220px; background: var(--card-bg); border: 2px solid var(--card-border); border-radius: var(--radius-lg); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 24px; position: relative; overflow: hidden; transition: border-color 0.3s, box-shadow 0.3s; }
+    
+    /* 狀態視覺主題 */
+    .display-window.theme-waiting { border-color: rgba(0, 242, 254, 0.4); box-shadow: 0 0 20px rgba(0, 242, 254, 0.1); }
+    .display-window.theme-loading { border-color: var(--accent-orange); box-shadow: 0 0 20px rgba(255, 145, 0, 0.2); }
+    .display-window.theme-success { border-color: var(--accent-green); box-shadow: 0 0 30px rgba(0, 230, 118, 0.3); }
+    .display-window.theme-error { border-color: var(--accent-red); box-shadow: 0 0 30px rgba(255, 82, 82, 0.3); }
+    .display-window.theme-admin { border-color: var(--accent-purple); box-shadow: 0 0 30px rgba(124, 77, 255, 0.3); }
+
+    .status-icon { font-size: 3.5rem; margin-bottom: 12px; }
+    .status-main { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; }
+    .status-sub { font-size: 0.95rem; color: var(--text-sub); max-width: 80%; }
+    .points-badge { margin-top: 12px; background: rgba(0, 230, 118, 0.15); color: var(--accent-green); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 1.1rem; border: 1px solid rgba(0, 230, 118, 0.3); }
+
+    /* 二次重複打卡彈窗 (#confirmBox) */
+    .confirm-overlay { position: absolute; inset: 0; background: rgba(10, 14, 23, 0.92); backdrop-filter: blur(8px); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; z-index: 10; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .confirm-overlay.active { opacity: 1; pointer-events: auto; }
+    .confirm-btns { display: flex; gap: 12px; margin-top: 16px; width: 100%; max-width: 280px; }
+    .btn { flex: 1; padding: 12px; border: none; border-radius: var(--radius-md); font-weight: 700; cursor: pointer; transition: transform 0.1s, opacity 0.2s; }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary { background: linear-gradient(135deg, var(--primary-cyan), var(--primary-blue)); color: #000; }
+    .btn-danger { background: var(--accent-red); color: #fff; }
+    .btn-secondary { background: rgba(255, 255, 255, 0.1); color: var(--text-main); }
+
+    /* ==========================================
+       4. 管理者控制台 (#adminPanel)
+       ========================================== */
+    .admin-panel { margin-top: 16px; background: var(--card-bg); border: 1px solid var(--accent-purple); border-radius: var(--radius-lg); padding: 16px; display: none; backdrop-filter: blur(10px); }
+    .admin-panel.active { display: block; animation: slideUp 0.3s forwards; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    .admin-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 10px; margin-bottom: 14px; }
+    .admin-title { font-size: 1.1rem; font-weight: 700; color: var(--accent-purple); display: flex; align-items: center; gap: 6px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .form-group { margin-bottom: 10px; }
+    .form-group label { display: block; font-size: 0.8rem; color: var(--text-sub); margin-bottom: 4px; }
+    .input-field { width: 100%; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 10px; color: var(--text-main); font-size: 0.9rem; outline: none; }
+    .input-field:focus { border-color: var(--accent-purple); }
+
+    /* 人員列表與日誌區域 */
+    .log-list { max-height: 160px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); border: 1px solid var(--card-border); margin-top: 8px; }
+    .log-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.85rem; }
+
+    /* 閒置倒數警告框 (#idleWarningBox) */
+    .idle-warning { position: fixed; inset: 0; background: rgba(255, 82, 82, 0.2); backdrop-filter: blur(12px); border: 4px solid var(--accent-red); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; animation: blink 0.8s infinite; }
+    .idle-warning.active { display: flex; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+    /* 全螢幕 Modal */
+    .modal { position: fixed; inset: 0; background: rgba(10, 14, 23, 0.95); backdrop-filter: blur(10px); display: none; flex-direction: column; padding: 20px; z-index: 90; }
+    .modal.active { display: flex; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .modal-body { flex: 1; overflow-y: auto; }
+  </style>
+</head>
+<body>
+
+  <!-- 頂部 Bar -->
+  <header>
+    <div class="brand-title">文舞集 簽到系統</div>
+    <div class="nfc-badge">
+      <div class="pulse-dot"></div>
+      <span id="nfcStatusText">Web NFC 準備中</span>
+    </div>
+  </header>
+
+  <!-- 當日課程切換區 -->
+  <section class="course-section">
+    <div class="section-title">今日上架課程 (請選擇一門開始簽到)</div>
+    <div class="course-list" id="courseList">
+      <div style="color: var(--text-sub); font-size: 0.85rem;">載入當日課程中...</div>
+    </div>
+  </section>
+
+  <!-- 主感應與狀態顯示視窗 -->
+  <main class="display-window theme-waiting" id="displayWindow">
+    <div class="status-icon" id="statusIcon">🎴</div>
+    <div class="status-main" id="statusMain">請選擇課程</div>
+    <div class="status-sub" id="statusSub">點擊上方課程開關以啟動感應簽到</div>
+    <div class="points-badge" id="pointsBadge" style="display: none;"></div>
+
+    <!-- 重複打卡二次確認彈窗 (#confirmBox) -->
+    <div class="confirm-overlay" id="confirmBox">
+      <div style="font-size: 2rem; margin-bottom: 8px;">⚠️</div>
+      <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 4px;">60 秒內重複靠卡</div>
+      <div style="font-size: 0.85rem; color: var(--text-sub);" id="confirmMsg">請問是否要強制進行二次扣點？</div>
+      <div class="confirm-btns">
+        <button class="btn btn-secondary" id="btnConfirmNo">否 (取消)</button>
+        <button class="btn btn-primary" id="btnConfirmYes">是 (強制扣點)</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- 管理者控制台 (#adminPanel) -->
+  <section class="admin-panel" id="adminPanel">
+    <div class="admin-header">
+      <div class="admin-title">👑 管理員控制台 <span style="font-size: 0.75rem; color: var(--text-sub); font-weight: normal;" id="adminCardId"></span></div>
+      <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="closeAdminPanel()">退出管理</button>
+    </div>
+
+    <!-- 快捷功能鍵 -->
+    <div class="grid-2">
+      <button class="btn btn-secondary" id="btnViewStudents" onclick="openStudentReport()">📋 查看上課人員名單</button>
+      <button class="btn btn-secondary" onclick="fetchRecentLogs()">🕒 1小時簽到與退點</button>
+    </div>
+
+    <!-- 新增會員 / 點數儲值 區塊 -->
+    <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: var(--radius-md); margin-bottom: 12px;">
+      <div style="font-size: 0.85rem; font-weight: 700; margin-bottom: 8px; color: var(--primary-cyan);" id="memberActionTitle">會員開卡 / 儲值作業</div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>會員姓名</label>
+          <input type="text" class="input-field" id="adminMemberName" placeholder="輸入姓名">
+        </div>
+        <div class="form-group">
+          <label>卡片類別</label>
+          <select class="input-field" id="adminCardType">
+            <option value="一般">一般</option>
+            <option value="VIP">VIP</option>
+            <option value="體驗">體驗</option>
+            <option value="管理者">管理者</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>儲值/初始點數</label>
+          <input type="number" class="input-field" id="adminPoints" value="10">
+        </div>
+        <div class="form-group">
+          <label>有效到期日</label>
+          <input type="date" class="input-field" id="adminExpiryDate">
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 4px;">
+        <button class="btn btn-primary" onclick="submitCardAction()" id="btnSubmitCard">確認儲值 / 開卡</button>
+      </div>
+
+      <!-- 刪除卡片防呆開關 -->
+      <div style="margin-top: 12px; border-top: 1px dashed var(--card-border); padding-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.8rem; color: var(--text-sub);">解鎖危險操作 (刪除卡片)</span>
+        <label class="switch">
+          <input type="checkbox" id="toggleDeleteUnlock" onchange="toggleDeleteBtn(this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <button class="btn btn-danger" id="btnDeleteCard" style="width: 100%; margin-top: 8px; display: none;" onclick="executeDeleteCard()">確定刪除此會員卡片</button>
+    </div>
+
+    <!-- 遺失換卡區塊 -->
+    <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: var(--radius-md); margin-bottom: 12px;">
+      <div style="font-size: 0.85rem; font-weight: 700; margin-bottom: 8px; color: var(--accent-orange);">💳 卡片遺失換卡模式</div>
+      <div style="display: flex; gap: 8px;">
+        <input type="text" class="input-field" id="searchOldUserName" placeholder="搜尋舊會員姓名">
+        <button class="btn btn-secondary" onclick="searchReplaceUser()" style="width: 90px;">搜尋</button>
+      </div>
+      <div id="replaceSearchResult" style="margin-top: 8px; font-size: 0.85rem;"></div>
+    </div>
+
+    <!-- 月份結算區 -->
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <select class="input-field" id="selectSettlementMonth" style="flex: 1;"></select>
+      <button class="btn btn-secondary" onclick="triggerMonthlySettlement()" style="width: 110px;">📊 月份結算</button>
+    </div>
+
+    <!-- 近期日誌載入容器 -->
+    <div class="log-list" id="recentLogContainer" style="display: none;"></div>
+  </section>
+
+  <!-- 閒置倒數警告框 (#idleWarningBox) -->
+  <div class="idle-warning" id="idleWarningBox">
+    <div style="font-size: 3rem; margin-bottom: 8px;">⚠️</div>
+    <div style="font-size: 1.3rem; font-weight: 700;">管理員模式閒置逾時</div>
+    <div style="font-size: 2.5rem; font-weight: 800; color: #fff; margin: 10px 0;" id="idleCountdownText">5</div>
+    <div style="font-size: 0.9rem;">即將自動退出管理者權限以保安全...</div>
+  </div>
+
+  <!-- 統計報告 / 上課人員 Modal (#reportModal) -->
+  <div class="modal" id="reportModal">
+    <div class="modal-header">
+      <div style="font-weight: 700; font-size: 1.1rem; color: var(--primary-cyan);" id="modalReportTitle">統計報告</div>
+      <button class="btn btn-secondary" style="padding: 4px 10px;" onclick="closeModal('reportModal')">關閉</button>
+    </div>
+    <div class="modal-body" id="modalReportContent">
+      <div style="text-align: center; color: var(--text-sub); padding: 20px;">資料載入中...</div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================
+       5. 前端 JavaScript 完整業務邏輯與 API 串接
+       ========================================== */
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxh-0Xq4bF3sPYwwI-H6MjpN2ZjY3Jp1_ZfQN2TBrzNqGPj2P0MjudeHG2DYsQE4oytEg/exec"; // 請替換為您的 GAS 部署網址
+
+    // 全域狀態管理
+    let currentCourse = null;
+    let currentCardId = "";
+    let isForceBooking = false;
+    let isAdminMode = false;
+    let idleTimer = null;
+    let countdownTimer = null;
+    let idleSeconds = 0;
+    let nfcReader = null;
+
+    // 音效合成 (Web Audio API 原生無外部依賴)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playAudioTone(type) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === 'success') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // 880Hz 高音
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+      } else if (type === 'error') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, audioCtx.currentTime); // 220Hz -> 180Hz 低音
+        osc.frequency.exponentialRampToValueAtTime(180, audioCtx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      }
+    }
+
+    // 初始化頁面
+    document.addEventListener("DOMContentLoaded", () => {
+      fetchTodayCourses();
+      initNFC();
+      initMonthDropdown();
+      setDefaultExpiryDate();
+    });
+
+    // 1. 取得當日上架課程
+    async function fetchTodayCourses() {
+      try {
+        const res = await fetch(`${GAS_URL}?action=getTodayCourses`);
+        const data = await res.json();
+        renderCourseList(data.courses || []);
+      } catch (e) {
+        console.error("載入課程失敗:", e);
+        // 備用示範資料 (避免頁面完全卡死)
+        renderCourseList([
+          { courseName: "MV舞蹈班", teacher: "樂迪老師", timeInfo: "週二 18:10-19:10" },
+          { courseName: "兒童街舞班", teacher: "小舞老師", timeInfo: "週二 19:20-20:20" }
+        ]);
+      }
+    }
+
+    function renderCourseList(courses) {
+      const container = document.getElementById("courseList");
+      if (courses.length === 0) {
+        container.innerHTML = `<div style="color:var(--text-sub); font-size:0.85rem;">今日無上架課程</div>`;
+        return;
+      }
+      container.innerHTML = courses.map((c, idx) => `
+        <div class="course-item" id="courseCard_${idx}" onclick="selectCourse(${idx}, '${c.courseName}', '${c.teacher}')">
+          <div>
+            <div class="course-name">${c.courseName}</div>
+            <div class="course-teacher">👤 ${c.teacher} | ${c.timeInfo}</div>
+          </div>
+          <label class="switch" onclick="event.stopPropagation();">
+            <input type="checkbox" id="switch_${idx}" onchange="toggleCourseSwitch(${idx}, '${c.courseName}', '${c.teacher}')">
+            <span class="slider"></span>
+          </label>
+        </div>
+      `).join('');
+    }
+
+    // 單選切換課程邏輯
+    function toggleCourseSwitch(idx, courseName, teacher) {
+      const isChecked = document.getElementById(`switch_${idx}`).checked;
+      
+      // 先關閉所有 Switch
+      document.querySelectorAll('.course-list input[type="checkbox"]').forEach(sw => sw.checked = false);
+      document.querySelectorAll('.course-item').forEach(item => item.classList.remove('active'));
+
+      if (isChecked) {
+        document.getElementById(`switch_${idx}`).checked = true;
+        document.getElementById(`courseCard_${idx}`).classList.add('active');
+        currentCourse = { courseName, teacher };
+        updateUI('waiting', '等待靠卡簽到', `已選取：${courseName} (${teacher})`);
+      } else {
+        currentCourse = null;
+        updateUI('waiting', '請選擇課程', '點擊上方課程開關以啟動感應簽到');
+      }
+    }
+
+    function selectCourse(idx, courseName, teacher) {
+      const sw = document.getElementById(`switch_${idx}`);
+      sw.checked = !sw.checked;
+      toggleCourseSwitch(idx, courseName, teacher);
+    }
+
+    // 2. Web NFC 監聽與靠卡處理
+    async function initNFC() {
+      const badgeText = document.getElementById("nfcStatusText");
+      if ('NDEFReader' in window) {
+        try {
+          nfcReader = new NDEFReader();
+          await nfcReader.scan();
+          badgeText.innerText = "NFC 監聽中";
+          
+          nfcReader.onreading = event => {
+            const cardId = event.serialNumber.replace(/:/g, '').toUpperCase(); // 轉大寫 UID
+            handleCardScanned(cardId);
+          };
+        } catch (error) {
+          badgeText.innerText = "NFC 權限受阻";
+          console.error("NFC Scan 錯誤:", error);
+        }
+      } else {
+        badgeText.innerText = "瀏覽器不支援 Web NFC (改模擬測試)";
+        // 點擊狀態視窗模擬靠卡測試
+        document.getElementById("displayWindow").addEventListener("click", () => {
+          if (!currentCourse && !isAdminMode) {
+            alert("請先開啟上方任意一門課程的簽到開關！");
+            return;
+          }
+          const mockCardId = prompt("【測試模擬】請輸入或刷入卡號 UID:", "04A1B2C3D4");
+          if (mockCardId) handleCardScanned(mockCardId.toUpperCase());
+        });
+      }
+    }
+
+    // 3. 靠卡處理流程[cite: 6]
+    async function handleCardScanned(cardId) {
+      if (isAdminMode) {
+        resetIdleTimer(); // 重置管理員閒置倒數[cite: 6]
+      }
+      currentCardId = cardId;
+
+      // 若未選擇課程且非管理模式
+      if (!currentCourse && !isAdminMode) {
+        updateUI('error', '未選擇簽到課程', '請先開啟上方當日課程開關');
+        playAudioTone('error');
+        return;
+      }
+
+      updateUI('loading', '感應卡片中...', `卡號：${cardId}`);
+
+      try {
+        const payload = {
+          action: "checkIn",
+          cardId: cardId,
+          courseName: currentCourse ? currentCourse.courseName : "",
+          teacher: currentCourse ? currentCourse.teacher : "",
+          isForce: isForceBooking
+        };
+
+        const res = await fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        // 重置強制二次扣點標記
+        isForceBooking = false;
+
+        // 邏輯判斷處理[cite: 6]
+        if (data.status === "admin_unlocked") {
+          // 感應到管理者卡片 -> 解鎖後台[cite: 6]
+          playAudioTone('success');
+          openAdminPanel(cardId);
+        } else if (data.status === "need_confirm") {
+          // 60秒重複打卡二次確認[cite: 6]
+          playAudioTone('error');
+          showConfirmBox(`會員【${data.name}】於 60 秒內重複靠卡，是否強制二次扣點？`);
+        } else if (data.status === "success") {
+          // 簽到扣點成功[cite: 6]
+          playAudioTone('success');
+          updateUI('success', `簽到成功：${data.name}`, `異動後剩餘點數`, data.newPoints);
+        } else if (data.status === "new_card_prompt") {
+          // 空白新卡 -> 跳轉開卡提示[cite: 6]
+          playAudioTone('error');
+          if (isAdminMode) {
+            document.getElementById("adminMemberName").focus();
+            updateUI('admin', '感應到全新空白卡', `卡號：${cardId} (請填寫下方資料進行開卡)`);
+          } else {
+            updateUI('error', '此卡片尚未開卡', '請感應管理者卡片解鎖權限後進行開卡');
+          }
+        } else {
+          // 其他錯誤 (點數不足、鎖卡、過期)[cite: 6]
+          playAudioTone('error');
+          updateUI('error', '簽到失敗', data.message || '點數不足或卡片已鎖定');
+        }
+
+      } catch (e) {
+        console.error("API 請求異常:", e);
+        playAudioTone('error');
+        updateUI('error', '系統連線異常', '請檢查網路狀態或後端 GAS 設定');
+      }
+    }
+
+    // 二次重複打卡確認彈窗按鈕[cite: 6]
+    document.getElementById("btnConfirmYes").addEventListener("click", () => {
+      hideConfirmBox();
+      isForceBooking = true;
+      handleCardScanned(currentCardId);
+    });
+    document.getElementById("btnConfirmNo").addEventListener("click", () => {
+      hideConfirmBox();
+      updateUI('waiting', '已取消二次簽到', '請重新靠卡');
+    });
+
+    function showConfirmBox(msg) {
+      document.getElementById("confirmMsg").innerText = msg;
+      document.getElementById("confirmBox").classList.add("active");
+    }
+    function hideConfirmBox() {
+      document.getElementById("confirmBox").classList.remove("active");
+    }
+
+    // 4. 管理者介面與 25秒閒置保護[cite: 6]
+    function openAdminPanel(cardId) {
+      isAdminMode = true;
+      document.getElementById("adminPanel").classList.add("active");
+      document.getElementById("adminCardId").innerText = `(管理者: ${cardId})`;
+      updateUI('admin', '👑 已進入管理者模式', '可進行儲值、開卡、退點與月結算作業');
+      resetIdleTimer();
+    }
+
+    function closeAdminPanel() {
+      isAdminMode = false;
+      document.getElementById("adminPanel").classList.remove("active");
+      clearTimeout(idleTimer);
+      clearInterval(countdownTimer);
+      document.getElementById("idleWarningBox").classList.remove("active");
+      updateUI('waiting', '已退出管理者模式', currentCourse ? `已選取：${currentCourse.courseName}` : '請選擇課程');
+    }
+
+    // 25 秒無操作安全保護 (20秒靜置 + 5秒倒數)[cite: 6]
+    function resetIdleTimer() {
+      if (!isAdminMode) return;
+      clearTimeout(idleTimer);
+      clearInterval(countdownTimer);
+      document.getElementById("idleWarningBox").classList.remove("active");
+
+      idleTimer = setTimeout(() => {
+        // 20秒無操作，啟動 5 秒倒數警告
+        let count = 5;
+        const countdownBox = document.getElementById("idleWarningBox");
+        const countText = document.getElementById("idleCountdownText");
+        countText.innerText = count;
+        countdownBox.classList.add("active");
+
+        countdownTimer = setInterval(() => {
+          count--;
+          countText.innerText = count;
+          if (count <= 0) {
+            clearInterval(countdownTimer);
+            closeAdminPanel(); // 強制退出管理模式[cite: 6]
+          }
+        }, 1000);
+
+      }, 20000); // 20 秒
+    }
+
+    // 監聽頁面任何操作以重置閒置倒數
+    ['click', 'touchstart', 'mousemove', 'keydown'].forEach(evt => {
+      document.addEventListener(evt, () => {
+        if (isAdminMode) resetIdleTimer();
+      });
+    });
+
+    // 5. 管理員 API 功能操作[cite: 6]
+
+    // (1) 會員開卡 / 點數儲值[cite: 6]
+    async function submitCardAction() {
+      const name = document.getElementById("adminMemberName").value.trim();
+      const cardType = document.getElementById("adminCardType").value;
+      const points = parseInt(document.getElementById("adminPoints").value);
+      const expiryDate = document.getElementById("adminExpiryDate").value;
+
+      if (!currentCardId) { alert("請先感應要操作的會員卡片！"); return; }
+      if (!name) { alert("請輸入會員姓名！"); return; }
+
+      updateUI('loading', '正在寫入資料庫...', '請稍候');
+
+      try {
+        const res = await fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: "addOrUpdateCard",
+            cardId: currentCardId,
+            name, cardType, points, expiryDate
+          })
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          playAudioTone('success');
+          alert("開卡/儲值成功！");
+          updateUI('admin', '儲值完成', `會員：${name} | 剩餘點數：${data.newPoints}`);
+        } else {
+          alert("操作失敗: " + data.message);
+        }
+      } catch (e) {
+        alert("網路連線錯誤");
+      }
+    }
+
+    // (2) 刪除卡片雙重防呆機制[cite: 6]
+    function toggleDeleteBtn(unlocked) {
+      document.getElementById("btnDeleteCard").style.display = unlocked ? "block" : "none";
+    }
+
+    async function executeDeleteCard() {
+      if (!currentCardId) return;
+      if (!confirm(`⚠️ 確定要徹底刪除卡號 [${currentCardId}] 的會員資料嗎？此動作無法復原！`)) return;
+
+      try {
+        const res = await fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ action: "deleteCard", cardId: currentCardId })
+        });
+        const data = await res.json();
+        alert(data.message || "卡片已刪除");
+        closeAdminPanel();
+      } catch (e) { alert("刪除失敗"); }
+    }
+
+    // (3) 查詢 1 小時內簽到名單與退點[cite: 6]
+    async function fetchRecentLogs() {
+      const container = document.getElementById("recentLogContainer");
+      container.style.display = "block";
+      container.innerHTML = `<div style="padding:10px; color:var(--text-sub);">載入近期簽到紀錄中...</div>`;
+
+      try {
+        const res = await fetch(`${GAS_URL}?action=getRecentLogs`);
+        const data = await res.json();
+        
+        if (!data.logs || data.logs.length === 0) {
+          container.innerHTML = `<div style="padding:10px; color:var(--text-sub);">近 1 小時內無簽到紀錄</div>`;
+          return;
+        }
+
+        container.innerHTML = data.logs.map(log => `
+          <div class="log-item">
+            <div>
+              <strong>${log.name}</strong> (${log.time})
+              <div style="font-size:0.75rem; color:var(--text-sub);">${log.note}</div>
+            </div>
+            <button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="cancelCheckIn('${log.cardId}', '${log.timestamp}')">取消簽到/退點</button>
+          </div>
+        `).join('');
+      } catch (e) {
+        container.innerHTML = `<div style="padding:10px; color:var(--accent-red);">載入紀錄失敗</div>`;
+      }
+    }
+
+    // 取消簽到退點[cite: 6]
+    async function cancelCheckIn(cardId, timestamp) {
+      if (!confirm("確定要為此學員辦理取消簽到並退回 1 點嗎？")) return;
+
+      try {
+        const res = await fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ action: "cancelCheckIn", cardId, timestamp })
+        });
+        const data = await res.json();
+        alert(data.message || "已退點");
+        fetchRecentLogs(); // 重整列表
+      } catch (e) { alert("退點操作失敗"); }
+    }
+
+    // (4) 遺失換卡搜尋與覆蓋[cite: 6]
+    async function searchReplaceUser() {
+      const name = document.getElementById("searchOldUserName").value.trim();
+      if (!name) return;
+      const resContainer = document.getElementById("replaceSearchResult");
+      resContainer.innerText = "搜尋中...";
+
+      try {
+        const res = await fetch(`${GAS_URL}?action=searchUserByName&name=${encodeURIComponent(name)}`);
+        const data = await res.json();
+        if (data.user) {
+          resContainer.innerHTML = `
+            找到會員：<strong>${data.user.name}</strong> (舊卡號: ${data.user.cardId})<br>
+            <button class="btn btn-primary" style="margin-top:6px; padding:4px 10px; font-size:0.8rem;" onclick="executeReplaceCard('${data.user.cardId}')">將當前靠卡綁定為新卡</button>
+          `;
+        } else {
+          resContainer.innerText = "未找到該姓名的會員";
+        }
+      } catch (e) { resContainer.innerText = "搜尋失敗"; }
+    }
+
+    async function executeReplaceCard(oldCardId) {
+      if (!currentCardId) { alert("請先靠【新卡】感應卡號！"); return; }
+      if (!confirm(`確定要將舊卡 [${oldCardId}] 的權限與歷史紀錄轉移覆蓋至新卡 [${currentCardId}] 嗎？`)) return;
+
+      try {
+        const res = await fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ action: "replaceCard", oldCardId, newCardId: currentCardId })
+        });
+        const data = await res.json();
+        alert(data.message || "換卡完成");
+        document.getElementById("replaceSearchResult").innerText = "";
+      } catch (e) { alert("換卡失敗"); }
+    }
+
+    // (5) 查看上課人員名單與月份結算 Modal[cite: 6]
+    async function openStudentReport() {
+      if (!currentCourse) { alert("請先選擇一門上課課程！"); return; }
+      openModal('reportModal', `📋 ${currentCourse.courseName} - 上課人員應到實到名單`);
+      
+      try {
+        const res = await fetch(`${GAS_URL}?action=getCourseStudents&courseName=${encodeURIComponent(currentCourse.courseName)}`);
+        const data = await res.json();
+        
+        let html = `<div style="line-height:1.8;">`;
+        html += `<h4 style="color:var(--primary-cyan); margin-bottom:8px;">正式會員 (${data.members ? data.members.length : 0} 人)</h4>`;
+        (data.members || []).forEach(m => {
+          html += `<div>${m.checkedIn ? '✅' : '❌'} ${m.name} (${m.checkedIn ? '已簽到' : '未簽到'})</div>`;
+        });
+        html += `<h4 style="color:var(--accent-orange); margin-top:12px; margin-bottom:8px;">體驗學員 (${data.trials ? data.trials.length : 0} 人)</h4>`;
+        (data.trials || []).forEach(t => {
+          html += `<div>${t.checkedIn ? '✅' : '❌'} ${t.name} (${t.checkedIn ? '已簽到' : '未簽到'})</div>`;
+        });
+        html += `</div>`;
+
+        document.getElementById("modalReportContent").innerHTML = html;
+      } catch (e) {
+        document.getElementById("modalReportContent").innerText = "載入名單失敗";
+      }
+    }
+
+    async function triggerMonthlySettlement() {
+      const month = document.getElementById("selectSettlementMonth").value;
+      openModal('reportModal', `📊 ${month} 月份結算統計報表`);
+
+      try {
+        const res = await fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ action: "monthlySettlement", month })
+        });
+        const data = await res.json();
+        document.getElementById("modalReportContent").innerHTML = `<pre style="white-space:pre-wrap; font-size:0.85rem;">${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (e) {
+        document.getElementById("modalReportContent").innerText = "結算失敗";
+      }
+    }
+
+    // UI 通用輔助 Function
+    function updateUI(theme, mainText, subText, points = null) {
+      const win = document.getElementById("displayWindow");
+      const icon = document.getElementById("statusIcon");
+      const main = document.getElementById("statusMain");
+      const sub = document.getElementById("statusSub");
+      const badge = document.getElementById("pointsBadge");
+
+      win.className = `display-window theme-${theme}`;
+      main.innerText = mainText;
+      sub.innerText = subText;
+
+      const icons = { waiting: '🎴', loading: '⏳', success: '🎉', error: '⚠️', admin: '👑' };
+      icon.innerText = icons[theme] || '🎴';
+
+      if (points !== null) {
+        badge.innerText = `剩餘點數：${points} 點`;
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+    }
+
+    function openModal(id, title) {
+      document.getElementById("modalReportTitle").innerText = title;
+      document.getElementById(id).classList.add("active");
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove("active");
+    }
+
+    function initMonthDropdown() {
+      const select = document.getElementById("selectSettlementMonth");
+      const d = new Date();
+      for (let i = 0; i < 6; i++) {
+        const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+        const str = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
+        select.innerHTML += `<option value="${str}">${str}</option>`;
+      }
+    }
+
+    function setDefaultExpiryDate() {
+      const d = new Date();
+      d.setDate(d.getDate() + 100); // 預設 +100 天[cite: 6]
+      document.getElementById("adminExpiryDate").value = d.toISOString().split('T')[0];
+    }
+  </script>
+</body>
+</html>
