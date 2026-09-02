@@ -295,28 +295,42 @@
       setDefaultExpiryDate();
     });
 
-    // 1. 取得當日上架課程
+    // 取得當前週幾關鍵字
+    function getTodayDayKey() {
+      const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+      return days[new Date().getDay()];
+    }
+
+    // 1. 取得當日上架課程（要求 1 修改）
     async function fetchTodayCourses() {
+      const todayKey = getTodayDayKey();
       try {
         const res = await fetch(`${GAS_URL}?action=getTodayCourses`);
         const data = await res.json();
-        renderCourseList(data.courses || []);
+        const rawCourses = data.courses || [];
+        
+        // 篩選當日相符之課程
+        const todayCourses = rawCourses.filter(c => c.timeInfo && c.timeInfo.includes(todayKey));
+        renderCourseList(todayCourses, todayKey);
       } catch (e) {
         console.error("載入課程失敗:", e);
-        // 備用示範資料 (避免頁面完全卡死)
-        renderCourseList([
+        // 備用示範資料（僅保留符合今日之範例）
+        const mockCourses = [
           { courseName: "MV舞蹈班", teacher: "樂迪老師", timeInfo: "週二 18:10-19:10" },
           { courseName: "兒童街舞班", teacher: "小舞老師", timeInfo: "週二 19:20-20:20" }
-        ]);
+        ].filter(c => c.timeInfo.includes(todayKey));
+        
+        renderCourseList(mockCourses, todayKey);
       }
     }
 
-    function renderCourseList(courses) {
+    function renderCourseList(courses, todayKey) {
       const container = document.getElementById("courseList");
       if (courses.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-sub); font-size:0.85rem;">今日無上架課程</div>`;
+        container.innerHTML = `<div style="color:var(--text-sub); font-size:0.85rem;">今日 (${todayKey}) 無排定課程</div>`;
         return;
       }
+      
       container.innerHTML = courses.map((c, idx) => `
         <div class="course-item" id="courseCard_${idx}" onclick="selectCourse(${idx}, '${c.courseName}', '${c.teacher}')">
           <div>
@@ -329,6 +343,17 @@
           </label>
         </div>
       `).join('');
+
+      // 若當日僅有一門課程，預設自動開啓該課程簽到
+      if (courses.length === 1) {
+        setTimeout(() => {
+          const sw = document.getElementById("switch_0");
+          if (sw) {
+            sw.checked = true;
+            toggleCourseSwitch(0, courses[0].courseName, courses[0].teacher);
+          }
+        }, 100);
+      }
     }
 
     // 單選切換課程邏輯
@@ -387,10 +412,10 @@
       }
     }
 
-    // 3. 靠卡處理流程[cite: 6]
+    // 3. 靠卡處理流程 (要求 2 & 3 修改)
     async function handleCardScanned(cardId) {
       if (isAdminMode) {
-        resetIdleTimer(); // 重置管理員閒置倒數[cite: 6]
+        resetIdleTimer(); // 重置管理員閒置倒數
       }
       currentCardId = cardId;
 
@@ -401,7 +426,7 @@
         return;
       }
 
-      updateUI('loading', '感應卡片中...', `卡號：${cardId}`);
+      updateUI('loading', '讀取卡片資料中...', `卡號：${cardId}`);
 
       try {
         const payload = {
@@ -422,21 +447,21 @@
         // 重置強制二次扣點標記
         isForceBooking = false;
 
-        // 邏輯判斷處理[cite: 6]
+        // 要求 2: 判定卡片狀態與後續對應處理
         if (data.status === "admin_unlocked") {
-          // 感應到管理者卡片 -> 解鎖後台[cite: 6]
+          // 感應到管理者卡片 -> 解鎖後台
           playAudioTone('success');
           openAdminPanel(cardId);
         } else if (data.status === "need_confirm") {
-          // 60秒重複打卡二次確認[cite: 6]
+          // 60秒重複打卡二次確認
           playAudioTone('error');
           showConfirmBox(`會員【${data.name}】於 60 秒內重複靠卡，是否強制二次扣點？`);
         } else if (data.status === "success") {
-          // 簽到扣點成功[cite: 6]
+          // 要求 3: 簽到扣點成功並已寫入 [課程名稱] 工作表
           playAudioTone('success');
           updateUI('success', `簽到成功：${data.name}`, `異動後剩餘點數`, data.newPoints);
         } else if (data.status === "new_card_prompt") {
-          // 空白新卡 -> 跳轉開卡提示[cite: 6]
+          // 空白新卡 -> 跳轉開卡提示
           playAudioTone('error');
           if (isAdminMode) {
             document.getElementById("adminMemberName").focus();
@@ -445,7 +470,7 @@
             updateUI('error', '此卡片尚未開卡', '請感應管理者卡片解鎖權限後進行開卡');
           }
         } else {
-          // 其他錯誤 (點數不足、鎖卡、過期)[cite: 6]
+          // 其他狀態 (點數不足、鎖卡、過期)
           playAudioTone('error');
           updateUI('error', '簽到失敗', data.message || '點數不足或卡片已鎖定');
         }
@@ -457,7 +482,7 @@
       }
     }
 
-    // 二次重複打卡確認彈窗按鈕[cite: 6]
+    // 二次重複打卡確認彈窗按鈕
     document.getElementById("btnConfirmYes").addEventListener("click", () => {
       hideConfirmBox();
       isForceBooking = true;
@@ -476,7 +501,7 @@
       document.getElementById("confirmBox").classList.remove("active");
     }
 
-    // 4. 管理者介面與 25秒閒置保護[cite: 6]
+    // 4. 管理者介面與 25秒閒置保護
     function openAdminPanel(cardId) {
       isAdminMode = true;
       document.getElementById("adminPanel").classList.add("active");
@@ -494,7 +519,7 @@
       updateUI('waiting', '已退出管理者模式', currentCourse ? `已選取：${currentCourse.courseName}` : '請選擇課程');
     }
 
-    // 25 秒無操作安全保護 (20秒靜置 + 5秒倒數)[cite: 6]
+    // 25 秒無操作安全保護 (20秒靜置 + 5秒倒數)
     function resetIdleTimer() {
       if (!isAdminMode) return;
       clearTimeout(idleTimer);
@@ -514,7 +539,7 @@
           countText.innerText = count;
           if (count <= 0) {
             clearInterval(countdownTimer);
-            closeAdminPanel(); // 強制退出管理模式[cite: 6]
+            closeAdminPanel(); // 強制退出管理模式
           }
         }, 1000);
 
@@ -528,9 +553,9 @@
       });
     });
 
-    // 5. 管理員 API 功能操作[cite: 6]
+    // 5. 管理員 API 功能操作
 
-    // (1) 會員開卡 / 點數儲值[cite: 6]
+    // (1) 會員開卡 / 點數儲值
     async function submitCardAction() {
       const name = document.getElementById("adminMemberName").value.trim();
       const cardType = document.getElementById("adminCardType").value;
@@ -565,7 +590,7 @@
       }
     }
 
-    // (2) 刪除卡片雙重防呆機制[cite: 6]
+    // (2) 刪除卡片雙重防呆機制
     function toggleDeleteBtn(unlocked) {
       document.getElementById("btnDeleteCard").style.display = unlocked ? "block" : "none";
     }
@@ -586,7 +611,7 @@
       } catch (e) { alert("刪除失敗"); }
     }
 
-    // (3) 查詢 1 小時內簽到名單與退點[cite: 6]
+    // (3) 查詢 1 小時內簽到名單與退點
     async function fetchRecentLogs() {
       const container = document.getElementById("recentLogContainer");
       container.style.display = "block";
@@ -615,7 +640,7 @@
       }
     }
 
-    // 取消簽到退點[cite: 6]
+    // 取消簽到退點
     async function cancelCheckIn(cardId, timestamp) {
       if (!confirm("確定要為此學員辦理取消簽到並退回 1 點嗎？")) return;
 
@@ -631,7 +656,7 @@
       } catch (e) { alert("退點操作失敗"); }
     }
 
-    // (4) 遺失換卡搜尋與覆蓋[cite: 6]
+    // (4) 遺失換卡搜尋與覆蓋
     async function searchReplaceUser() {
       const name = document.getElementById("searchOldUserName").value.trim();
       if (!name) return;
@@ -668,7 +693,7 @@
       } catch (e) { alert("換卡失敗"); }
     }
 
-    // (5) 查看上課人員名單與月份結算 Modal[cite: 6]
+    // (5) 查看上課人員名單與月份結算 Modal
     async function openStudentReport() {
       if (!currentCourse) { alert("請先選擇一門上課課程！"); return; }
       openModal('reportModal', `📋 ${currentCourse.courseName} - 上課人員應到實到名單`);
@@ -754,7 +779,7 @@
 
     function setDefaultExpiryDate() {
       const d = new Date();
-      d.setDate(d.getDate() + 100); // 預設 +100 天[cite: 6]
+      d.setDate(d.getDate() + 100); // 預設 +100 天
       document.getElementById("adminExpiryDate").value = d.toISOString().split('T')[0];
     }
   </script>
