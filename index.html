@@ -112,6 +112,9 @@
 </div>
 
 <div class="card-container">
+  <!-- 隱藏輸入框：強制 iPhone 在接收掃描輸入時，保持英數輸入模式並過濾注音 -->
+  <input type="text" id="scanInput" style="position:absolute; opacity:0; top:-1000px; left:-1000px;" autocapitalize="off" autocomplete="off" spellcheck="false" inputmode="text">
+
   <h2>&lt;文舞集&gt;簽到</h2>
 
   <div class="course-list-box">
@@ -227,39 +230,46 @@
   let isScanning=!1,isAdminMode=!1,isReplaceMode=!1,currentScannedCardForAdmin="",pendingCardId="",targetReplaceUser=null,autoResetTimer=null,adminIdleTimer=null,adminCountdownInterval=null,countdownSeconds=5,audioCtx=null;
   let activeCourseInfo="",activeCourseName="";
 
-  // 電腦模擬鍵盤輸入 (刷卡機 / 讀卡機 / 條碼槍) 相關變數
-  let keyboardBuffer = "";
-  let keyboardTimer = null;
-
   window.addEventListener("DOMContentLoaded", ()=>{
     fetchTodayCourses();
     initMonthDropdown();
     initKeyboardScanListener();
   });
 
-  // 全域鍵盤監聽，收集電腦模擬鍵盤輸入的卡號 (預設以 Enter 鍵為結束字元)
-  function initKeyboardScanListener() {
-    window.addEventListener("keydown", (e) => {
-      // 若使用者正在輸入框內打字（如：搜尋學員姓名、設定日期等），則不攔截
-      const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
-      if (tag === "input" || tag === "select" || tag === "textarea") {
-        return;
+  // 自動聚焦於隱藏輸入框，防止非預期操作，並即時過濾注音
+  function focusScanInput() {
+    const scanInput = document.getElementById("scanInput");
+    if (scanInput) {
+      const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
+      if (activeTag !== "input" && activeTag !== "select" && activeTag !== "textarea") {
+        scanInput.focus();
       }
+    }
+  }
 
+  // 修改後的鍵盤與讀卡機監聽：透過隱藏 input 解決 iPhone 注音轉換問題
+  function initKeyboardScanListener() {
+    const scanInput = document.getElementById("scanInput");
+
+    // 初次載入與點擊畫面時自動聚焦至隱藏框
+    focusScanInput();
+    document.addEventListener("click", focusScanInput);
+
+    // 監聽 Enter 鍵與輸入事件
+    scanInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
-        if (keyboardBuffer.trim().length > 0) {
-          const scannedCode = keyboardBuffer.trim().toUpperCase();
-          keyboardBuffer = "";
+        e.preventDefault();
+        const scannedCode = scanInput.value.trim().toUpperCase();
+        scanInput.value = ""; // 清空緩衝
+        if (scannedCode.length > 0) {
           handleCardInput(scannedCode);
         }
-      } else if (e.key.length === 1) { // 僅收集單一文字/數字字元
-        keyboardBuffer += e.key;
-        if (keyboardTimer) clearTimeout(keyboardTimer);
-        // 若超過 500ms 未繼續輸入則清空緩衝區，避免人工慢速輸入誤觸
-        keyboardTimer = setTimeout(() => {
-          keyboardBuffer = "";
-        }, 500);
       }
+    });
+
+    // 過濾非英數字符 (避免 iOS 注音輸入法發送組合好的注音符號)
+    scanInput.addEventListener("input", () => {
+      scanInput.value = scanInput.value.replace(/[^a-zA-Z0-9]/g, '');
     });
   }
 
