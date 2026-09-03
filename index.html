@@ -112,6 +112,9 @@
 </div>
 
 <div class="card-container">
+  <!-- 隱藏輸入框：強迫裝置以英數字處理並防止中文注音輸入 -->
+  <input type="text" id="scanInput" inputmode="numeric" autocapitalize="off" autocomplete="off" style="position:absolute; opacity:0; top:-1000px; left:-1000px; width:1px; height:1px;">
+
   <h2>&lt;文舞集&gt;簽到</h2>
 
   <div class="course-list-box">
@@ -237,27 +240,44 @@
     initKeyboardScanListener();
   });
 
-  // 全域鍵盤監聽，收集電腦模擬鍵盤輸入的卡號 (預設以 Enter 鍵為結束字元)
+  // 方法一調整：自動聚焦隱藏輸入框並防止中文注音輸入組合
   function initKeyboardScanListener() {
+    const scanInput = document.getElementById("scanInput");
+
+    // 隨時保持點擊畫面聚焦在隱藏輸入框上
+    document.body.addEventListener("click", (e) => {
+      const tag = e.target.tagName.toLowerCase();
+      if (tag !== "input" && tag !== "select" && tag !== "textarea" && tag !== "button") {
+        scanInput.focus();
+      }
+    });
+
+    scanInput.focus();
+
+    // 監聽鍵盤事件
     window.addEventListener("keydown", (e) => {
-      // 若使用者正在輸入框內打字（如：搜尋學員姓名、設定日期等），則不攔截
       const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
-      if (tag === "input" || tag === "select" || tag === "textarea") {
+      
+      // 若是在其他顯式的輸入框（如：管理者搜尋學員姓名、設定點數等），則不進行攔截
+      if ((tag === "input" || tag === "select" || tag === "textarea") && document.activeElement !== scanInput) {
         return;
       }
 
+      // 當讀卡機輸入 Enter 時視為一組完整的卡號感應完成
       if (e.key === "Enter") {
         if (keyboardBuffer.trim().length > 0) {
           const scannedCode = keyboardBuffer.trim().toUpperCase();
           keyboardBuffer = "";
+          scanInput.value = "";
           handleCardInput(scannedCode);
         }
-      } else if (e.key.length === 1) { // 僅收集單一文字/數字字元
+      } else if (e.key.length === 1 && !e.isComposing) { 
+        // 僅收集非注音組合狀態（!e.isComposing）下的單一字元，避免注音鍵盤混淆
         keyboardBuffer += e.key;
         if (keyboardTimer) clearTimeout(keyboardTimer);
-        // 若超過 500ms 未繼續輸入則清空緩衝區，避免人工慢速輸入誤觸
         keyboardTimer = setTimeout(() => {
           keyboardBuffer = "";
+          scanInput.value = "";
         }, 500);
       }
     });
