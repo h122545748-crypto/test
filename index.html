@@ -5,85 +5,78 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><文舞集>簽到</title>
   
-  <!-- 引入 Three.js 用於背景 WebGL 特效 -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  
+  <!-- Three.js Import Map -->
+  <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.167.0/build/three.module.js",
+        "addons/": "https://cdn.jsdelivr.net/npm/three@0.167.0/examples/jsm/"
+      }
+    }
+  </script>
+
   <style>
     *{box-sizing:border-box}
-    
-    /* 調整 body，不再侷限置中，改為滿版且支援 WebGL 背景顯示 */
-    body{
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-      background-color:#121212;
-      color:#fff;
-      margin:0;
-      padding:15px;
-      min-height:100vh;
-      overflow-x:hidden;
-      position:relative;
-    }
-
-    /* WebGL 背景相關樣式 */
-    #canvas {
-      position: fixed;
-      top: 0;
-      left: 0;
+    html, body {
       width: 100vw;
       height: 100vh;
-      z-index: -1;
+      padding: 0;
+      margin: 0;
+      background-color: #326696;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    a {
+      color: #0078ff;
+    }
+
+    /* Three.js 3D 雲海背景容器 */
+    .container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      width: 100vw;
+      padding: 0;
+      margin: 0;
+      z-index: 1;
       pointer-events: none;
     }
-    .clean-btn {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: rgba(30, 30, 30, 0.8);
-      border: 1px solid #444;
-      color: #aaa;
-      padding: 8px 14px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 12px;
-      z-index: 1000;
-      transition: all 0.2s;
-    }
-    .clean-btn:hover {
-      background: #ff007f;
-      color: #fff;
-      border-color: #ff007f;
-    }
 
-    /* 可拖曳與改變大小的視窗容器 (支援滑鼠操作) */
+    /* 簽到主卡片：支援滑鼠拖曳、調整大小、取消手機寬度限制 */
     .card-container{
-      background:rgba(30,30,30,0.92);
-      backdrop-filter: blur(10px);
+      background:#1e1e1e;
+      color:#fff;
       padding:24px;
       border-radius:20px;
-      box-shadow:0 10px 30px rgba(0,0,0,.5);
+      box-shadow:0 10px 30px rgba(0,0,0,.7);
       width: 500px;
-      max-width: 100%;
+      min-width: 350px;
+      min-height: 400px;
       text-align:center;
       position:absolute;
-      top: 50px;
-      left: 50px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
       resize: both;
       overflow: auto;
-      min-width: 320px;
-      min-height: 400px;
-      z-index: 10;
-      border: 1px solid rgba(255,255,255,0.1);
-    }
-    
-    /* 可拖曳標題列樣式 */
-    .drag-header {
-      cursor: move;
-      user-select: none;
-      padding-bottom: 5px;
-      margin-bottom: 10px;
-      border-bottom: 1px dashed rgba(255,255,255,0.1);
+      max-height: 90vh;
     }
 
-    h2{font-size:28px;margin-top:0;color:#ff007f;margin-bottom:0}
+    /* 可供拖曳的標題列樣式提示 */
+    .card-container h2 {
+      font-size: 28px;
+      margin-top: 0;
+      color: #ff007f;
+      cursor: move;
+      user-select: none;
+    }
     
     .course-list-box{background:#2a2a2a;border:1px solid #444;border-radius:12px;padding:12px;margin:15px 0;text-align:left}
     .course-list-title{font-size:16px;font-weight:700;color:#00d2ff;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
@@ -172,9 +165,8 @@
 </head>
 <body>
 
-<!-- WebGL 背景與清理按鈕 -->
-<canvas id="canvas"></canvas>
-<div class="clean-btn">clean the screen</div>
+<!-- Three.js 雲海背景畫布容器 -->
+<div class="container" id="container"></div>
 
 <div id="idleWarningBox" class="idle-warning-box">
   ⚠️ 檢測到閒置！系統即將於 <span id="idleCountdownSec" style="font-size:32px;text-decoration:underline;color:#fff;">5</span> 秒後自動退出管理者模式！<br>
@@ -191,12 +183,8 @@
   </div>
 </div>
 
-<!-- 可拖曳與調整大小的簽到主卡片容器 -->
 <div class="card-container" id="cardContainer">
-  <div class="drag-header" id="dragHeader">
-    <h2>&lt;文舞集&gt;簽到</h2>
-    <div style="font-size:11px; color:#888; margin-top:2px;">(可按住此處拖曳視窗，或透過右下角調整大小)</div>
-  </div>
+  <h2 id="cardHeader">&lt;文舞集&gt;簽到</h2>
 
   <div class="course-list-box">
     <div class="course-list-title">
@@ -304,86 +292,172 @@
   </div>
 </div>
 
-<!-- GLSL Shaders 用於 WebGL Flower Cursor 背景特效 -->
-<script type="x-shader/x-fragment" id="fragmentShader">
-    #define PI 3.14159265359
+<!-- Three.js 雲海背景動畫指令碼 -->
+<script type="module">
+  import * as THREE from "three";
+  import * as BufferGeometryUtils from "addons/utils/BufferGeometryUtils.js";
 
-    uniform float u_ratio;
-    uniform float u_moving;
-    uniform float u_stop_time;
-    uniform float u_speed;
-    uniform vec2 u_stop_randomizer;
-    uniform float u_clean;
-    uniform vec2 u_point;
-    uniform sampler2D u_texture;
-    varying vec2 vUv;
-
-    float rand(vec2 n) {
-        return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
-    }
-    float noise(vec2 n) {
-        const vec2 d = vec2(0., 1.);
-        vec2 b = floor(n), f = smoothstep(vec2(0.), vec2(1.), fract(n));
-        return mix(mix(rand(b), rand(b + d.yx), f.x), mix(rand(b + d.xy), rand(b + d.yy), f.x), f.y);
-    }
-
-    float flower_shape(vec2 _point, float _size, float _outline, float _tickniess, float _noise, float _angle_offset) {
-        float random_by_uv = noise(vUv);
-
-        float petals_thickness = .5;
-        float petals_number = 5. + floor(u_stop_randomizer[0] * 4.);
-        float angle_animated_offset = .7 * (random_by_uv - .5) / (1. + 30. * u_stop_time);
-        float flower_angle = atan(_point.y, _point.x) - angle_animated_offset;
-        float flower_sectoral_shape = abs(sin(flower_angle * .5 * petals_number + _angle_offset)) + _tickniess * petals_thickness;
-
-        vec2 flower_size_range = vec2(4., 18.);
-        float flower_radial_shape = length(_point) * (flower_size_range[0] + flower_size_range[1] * u_stop_randomizer[0]);
-        float radius_noise = sin(flower_angle * 13. + 15. * random_by_uv);
-        flower_radial_shape += _noise * radius_noise;
-
-        float flower_radius_grow = min(20000. * u_stop_time, 1.);
-        flower_radius_grow = 1. / flower_radius_grow;
-
-        float flower_shape = 1. - smoothstep(0., _size * flower_sectoral_shape, _outline * flower_radius_grow * flower_radial_shape);
-        flower_shape *= (1. - u_moving);
-
-        flower_shape *= (1. - step(1., u_stop_time));
-
-        return flower_shape;
-    }
-
-    void main() {
-        vec3 base = texture2D(u_texture, vUv).xyz;
-        vec2 cursor = vUv - u_point.xy;
-        cursor.x *= u_ratio;
-
-        vec3 stem_color = vec3(0., 2., 1.5);
-        float stem_radius = .003 * u_speed * u_moving;
-        float stem_shape = 1. - pow(smoothstep(0., stem_radius, dot(cursor, cursor)), .03);
-        vec3 stem = stem_shape * stem_color;
-
-        vec3 flower_color = vec3(.7 + u_stop_randomizer[1], .8 * u_stop_randomizer[1], 2.9 + u_stop_randomizer[0] * .6);
-        vec3 flower_new = flower_color * flower_shape(cursor, 1., .96, 1., .15, 0.);
-        vec3 flower_mask = 1. - vec3(flower_shape(cursor, 1.05, 1.07, 1., .15, 0.));
-        vec3 flower_mid = vec3(-.6) * flower_shape(cursor, .15, 1., 2., .1, 1.9);
-
-        vec3 color = base * flower_mask + (flower_new + flower_mid + stem);
-        color *= u_clean;
-        color = clamp(color, vec3(.0, .0, .15), vec3(1., 1., .4));
-
-        gl_FragColor = vec4(color, 1.);
-    }
-</script>
-
-<script type="x-shader/x-vertex" id="vertexShader">
-    varying vec2 vUv;
-    void main() {
+  const cloudShader = {
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
         vUv = uv;
-        gl_Position = vec4(position, 1.);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D map;
+      uniform vec3 fogColor;
+      uniform float fogNear;
+      uniform float fogFar;
+      varying vec2 vUv;
+
+      void main() {
+        float depth = gl_FragCoord.z / gl_FragCoord.w;
+        float fogFactor = smoothstep( fogNear, fogFar, depth );
+
+        gl_FragColor = texture2D( map, vUv );
+        gl_FragColor.w *= pow( gl_FragCoord.z, 20.0 );
+        gl_FragColor = mix( gl_FragColor, vec4( fogColor , gl_FragColor.w ), fogFactor );
+      }
+    `
+  };
+
+  const container = document.querySelector(".container");
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(
+    30,
+    window.innerWidth / window.innerHeight,
+    1,
+    3000
+  );
+  const renderer = new THREE.WebGLRenderer({
+    antialias: false,
+    alpha: true
+  });
+
+  let mesh, geometry, material;
+  let position;
+
+  var mouseX = 0,
+    mouseY = 0;
+  var start_time = Date.now();
+
+  var windowHalfX = window.innerWidth / 2;
+  var windowHalfY = window.innerHeight / 2;
+
+  var tLoader = new THREE.TextureLoader();
+
+  tLoader.load(
+    "https://mrdoob.com/lab/javascript/webgl/clouds/cloud10.png",
+    (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      init(t);
     }
+  );
+
+  function init(t) {
+    var canvas = document.createElement("canvas");
+    canvas.width = 32;
+    canvas.height = window.innerHeight;
+
+    var context = canvas.getContext("2d");
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    container.style.background = "url(" + canvas.toDataURL("image/png") + ")";
+    container.style.backgroundSize = "32px 100%";
+
+    camera.position.z = 6000;
+
+    geometry = new THREE.BufferGeometry();
+
+    var texture = t;
+    texture.magFilter = THREE.LinearMipMapLinearFilter;
+    texture.minFilter = THREE.LinearMipMapLinearFilter;
+
+    var fog = new THREE.Fog(0x4584b4, -100, 3000);
+    scene.fog = fog;
+
+    material = new THREE.ShaderMaterial({
+      uniforms: {
+        map: { type: "t", value: texture },
+        fogColor: { type: "c", value: fog.color },
+        fogNear: { type: "f", value: fog.near },
+        fogFar: { type: "f", value: fog.far }
+      },
+      vertexShader: cloudShader.vertexShader,
+      fragmentShader: cloudShader.fragmentShader,
+      depthWrite: false,
+      depthTest: false,
+      transparent: true
+    });
+
+    const planeGeo = new THREE.PlaneGeometry(64, 64);
+    var planeObj = new THREE.Object3D();
+    const geometries = [];
+
+    for (var i = 0; i < 8000; i++) {
+      planeObj.position.x = Math.random() * 1000 - 500;
+      planeObj.position.y = -Math.random() * Math.random() * 200 - 15;
+      planeObj.position.z = i;
+      planeObj.rotation.z = Math.random() * Math.PI;
+      planeObj.scale.x = planeObj.scale.y =
+        Math.random() * Math.random() * 1.5 + 0.5;
+      planeObj.updateMatrix();
+
+      const clonedPlaneGeo = planeGeo.clone();
+      clonedPlaneGeo.applyMatrix4(planeObj.matrix);
+      geometries.push(clonedPlaneGeo);
+    }
+
+    const planeGeos = BufferGeometryUtils.mergeGeometries(geometries);
+    const planesMesh = new THREE.Mesh(planeGeos, material);
+    planesMesh.renderOrder = 2;
+
+    const planesMeshA = planesMesh.clone();
+    planesMeshA.position.z = -8000;
+    planesMeshA.renderOrder = 1;
+
+    scene.add(planesMesh);
+    scene.add(planesMeshA);
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    container.appendChild(renderer.domElement);
+
+    document.addEventListener("mousemove", onDocumentMouseMove, false);
+    window.addEventListener("resize", onWindowResize, false);
+
+    animate();
+  }
+
+  function onDocumentMouseMove(event) {
+    mouseX = (event.clientX - windowHalfX) * 0.25;
+    mouseY = (event.clientY - windowHalfY) * 0.15;
+  }
+
+  function onWindowResize(event) {
+    windowHalfX = window.innerWidth / 2;
+    windowHalfY = window.innerHeight / 2;
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    position = ((Date.now() - start_time) * 0.03) % 8000;
+
+    camera.position.x += (mouseX - camera.position.x) * 0.01;
+    camera.position.y += (-mouseY - camera.position.y) * 0.01;
+    camera.position.z = -position + 8000;
+
+    renderer.render(scene, camera);
+  }
 </script>
 
-<!-- 主程式與 WebGL 背景互動邏輯 -->
+<!-- 原簽到系統邏輯與滑鼠拖曳互動功能 -->
 <script>
   const GAS_WEB_APP_URL="https://script.google.com/macros/s/AKfycbxh-0Xq4bF3sPYwwI-H6MjpN2ZjY3Jp1_ZfQN2TBrzNqGPj2P0MjudeHG2DYsQE4oytEg/exec";
   const displayWindow=document.getElementById("displayWindow"),adminPanel=document.getElementById("adminPanel"),adminTargetCard=document.getElementById("adminTargetCard"),cardStatusBadge=document.getElementById("cardStatusBadge"),confirmBox=document.getElementById("confirmBox"),confirmMsg=document.getElementById("confirmMsg"),sectionNewCard=document.getElementById("sectionNewCard"),sectionAddPoints=document.getElementById("sectionAddPoints"),replaceSection=document.getElementById("replaceSection"),idleWarningBox=document.getElementById("idleWarningBox"),idleCountdownSec=document.getElementById("idleCountdownSec"),btnViewStudents=document.getElementById("btnViewStudents");
@@ -398,14 +472,13 @@
     fetchTodayCourses();
     initMonthDropdown();
     initKeyboardScanListener();
-    initDraggableCard();
-    initWebGLBackground();
+    initCardDragging();
   });
 
-  // 實作卡片視窗滑鼠拖曳移動功能
-  function initDraggableCard() {
+  // 實作主卡片滑鼠拖曳功能
+  function initCardDragging() {
     const card = document.getElementById("cardContainer");
-    const header = document.getElementById("dragHeader");
+    const header = document.getElementById("cardHeader");
     let isDragging = false;
     let startX, startY, initialLeft, initialTop;
 
@@ -413,9 +486,15 @@
       isDragging = true;
       startX = e.clientX;
       startY = e.clientY;
-      initialLeft = card.offsetLeft;
-      initialTop = card.offsetTop;
-      card.style.position = "absolute";
+      
+      const rect = card.getBoundingClientRect();
+      card.style.transform = "none";
+      card.style.left = rect.left + "px";
+      card.style.top = rect.top + "px";
+      
+      initialLeft = rect.left;
+      initialTop = rect.top;
+      
       e.preventDefault();
     });
 
@@ -423,164 +502,13 @@
       if (!isDragging) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      card.style.left = `${initialLeft + dx}px`;
-      card.style.top = `${initialTop + dy}px`;
+      card.style.left = (initialLeft + dx) + "px";
+      card.style.top = (initialTop + dy) + "px";
     });
 
     window.addEventListener("mouseup", () => {
       isDragging = false;
     });
-  }
-
-  // 初始化 WebGL Flower Cursor 背景特效
-  function initWebGLBackground() {
-    const canvasEl = document.querySelector("#canvas");
-    const cleanBtn = document.querySelector(".clean-btn");
-
-    const pointer = {
-        x: .5,
-        y: .65,
-        moved: false,
-        speed: 0,
-        vanishCanvas: false,
-        drawingAllowed: true,
-    };
-    window.setTimeout(() => {
-        pointer.x = .7;
-        pointer.y = .5;
-        pointer.moved = true;
-    }, 400);
-
-    let basicMaterial, shaderMaterial;
-
-    let renderer = new THREE.WebGLRenderer({
-        canvas: canvasEl,
-        alpha: true,
-    });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    let sceneShader = new THREE.Scene();
-    let sceneBasic = new THREE.Scene();
-    let camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
-    let clock = new THREE.Clock();
-
-    let renderTargets = [
-        new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight),
-        new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight)
-    ];
-
-    createPlane();
-    updateSize();
-    window.addEventListener("resize", () => {
-        cleanCanvas();
-        updateSize();
-    });
-
-    render();
-
-    window.addEventListener("mousemove", (e) => {
-        if (pointer.drawingAllowed) {
-            pointer.moved = true;
-            const dx = 12 * (e.pageX / window.innerWidth - pointer.x);
-            const dy = 12 * (e.pageY / window.innerHeight - pointer.y);
-            pointer.x = e.pageX / window.innerWidth;
-            pointer.y = e.pageY / window.innerHeight;
-            pointer.speed = Math.min(2, Math.pow(dx, 2) + Math.pow(dy, 2));
-        }
-    });
-    canvasEl.addEventListener("click", (e) => {
-        pointer.x = e.pageX / window.innerWidth;
-        pointer.y = e.pageY / window.innerHeight;
-        pointer.drawingAllowed = !pointer.drawingAllowed;
-        if (pointer.drawingAllowed) {
-            pointer.moved = true;
-        }
-    });
-    window.addEventListener("touchmove", (e) => {
-        pointer.moved = true;
-        const dx = 5 * (e.targetTouches[0].pageX / window.innerWidth - pointer.x);
-        const dy = 5 * (e.targetTouches[0].pageY / window.innerHeight - pointer.y);
-        pointer.x = e.targetTouches[0].pageX / window.innerWidth;
-        pointer.y = e.targetTouches[0].pageY / window.innerHeight;
-        pointer.speed = Math.min(2, 20 * (Math.pow(dx, 2) + Math.pow(dy, 2)));
-    });
-
-    window.addEventListener("keydown", (e) => {
-        if (e.key === " ") {
-            cleanCanvas();
-        }
-    });
-    cleanBtn.addEventListener("click", cleanCanvas);
-
-    function cleanCanvas() {
-        pointer.vanishCanvas = true;
-        setTimeout(() => {
-            pointer.vanishCanvas = false;
-        }, 50);
-    }
-
-    function createPlane() {
-        shaderMaterial = new THREE.ShaderMaterial({
-            uniforms: {
-                u_stop_time: {type: "f", value: 0.},
-                u_point: {type: "v2", value: new THREE.Vector2(pointer.x, pointer.y)},
-                u_moving: {type: "f", value: 0.},
-                u_speed: {type: "f", value: 0.},
-                u_stop_randomizer: {type: "v2", value: new THREE.Vector2(Math.random(), Math.random())},
-                u_clean: {type: "f", value: 1.},
-                u_ratio: {type: "f", value: window.innerWidth / window.innerHeight},
-                u_texture: {type: "t", value: null}
-            },
-            vertexShader: document.getElementById("vertexShader").textContent,
-            fragmentShader: document.getElementById("fragmentShader").textContent
-        });
-        basicMaterial = new THREE.MeshBasicMaterial();
-
-        const planeGeometry = new THREE.PlaneGeometry(2, 2);
-        const planeBasic = new THREE.Mesh(planeGeometry, basicMaterial);
-        const planeShader = new THREE.Mesh(planeGeometry, shaderMaterial);
-        sceneBasic.add(planeBasic);
-        sceneShader.add(planeShader);
-    }
-
-    function render() {
-        shaderMaterial.uniforms.u_clean.value = pointer.vanishCanvas ? 0 : 1;
-        shaderMaterial.uniforms.u_point.value = new THREE.Vector2(pointer.x, 1 - pointer.y);
-        shaderMaterial.uniforms.u_texture.value = renderTargets[0].texture;
-        shaderMaterial.uniforms.u_ratio.value = window.innerWidth / window.innerHeight;
-        if (pointer.moved) {
-            shaderMaterial.uniforms.u_moving.value = 1.;
-            shaderMaterial.uniforms.u_stop_randomizer.value = new THREE.Vector2(Math.random(), Math.random());
-            if (window.innerWidth < 650) {
-                shaderMaterial.uniforms.u_stop_randomizer.value.x *= .2;
-                shaderMaterial.uniforms.u_stop_randomizer.value.x += .8;
-            }
-            shaderMaterial.uniforms.u_stop_time.value = 0.;
-            pointer.moved = false;
-        } else {
-            shaderMaterial.uniforms.u_moving.value = 0.;
-        }
-        shaderMaterial.uniforms.u_stop_time.value += clock.getDelta();
-        shaderMaterial.uniforms.u_speed.value = pointer.speed;
-
-        renderer.setRenderTarget(renderTargets[1]);
-        renderer.render(sceneShader, camera);
-
-        basicMaterial.map = renderTargets[1].texture;
-
-        renderer.setRenderTarget(null);
-        renderer.render(sceneBasic, camera);
-
-        let tmp = renderTargets[0];
-        renderTargets[0] = renderTargets[1];
-        renderTargets[1] = tmp;
-
-        requestAnimationFrame(render);
-    }
-
-    function updateSize() {
-        shaderMaterial.uniforms.u_ratio.value = window.innerWidth / window.innerHeight;
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    }
   }
 
   function initKeyboardScanListener() {
