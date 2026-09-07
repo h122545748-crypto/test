@@ -4,79 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><文舞集>簽到</title>
-  
-  <!-- Three.js Import Map -->
-  <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.167.0/build/three.module.js",
-        "addons/": "https://cdn.jsdelivr.net/npm/three@0.167.0/examples/jsm/"
-      }
-    }
-  </script>
-
   <style>
-    *{box-sizing:border-box}
-    html, body {
-      width: 100vw;
-      height: 100vh;
-      padding: 0;
-      margin: 0;
-      background-color: #326696;
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 13px;
-      font-weight: bold;
-      text-align: center;
-    }
-
-    a {
-      color: #0078ff;
-    }
-
-    /* Three.js 3D 雲海背景容器 */
-    .container {
-      position: absolute;
-      top: 0;
-      left: 0;
-      height: 100vh;
-      width: 100vw;
-      padding: 0;
-      margin: 0;
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    /* 簽到主卡片：支援滑鼠拖曳、調整大小、取消手機寬度限制 */
-    .card-container{
-      background:#1e1e1e;
-      color:#fff;
-      padding:24px;
-      border-radius:20px;
-      box-shadow:0 10px 30px rgba(0,0,0,.7);
-      width: 500px;
-      min-width: 350px;
-      min-height: 400px;
-      text-align:center;
-      position:absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 10;
-      resize: both;
-      overflow: auto;
-      max-height: 90vh;
-    }
-
-    /* 可供拖曳的標題列樣式提示 */
-    .card-container h2 {
-      font-size: 28px;
-      margin-top: 0;
-      color: #ff007f;
-      cursor: move;
-      user-select: none;
-    }
+    *{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background-color:#121212;color:#fff;margin:0;padding:15px;display:flex;justify-content:center;align-items:center;min-height:100vh}
+    .card-container{background:#1e1e1e;padding:24px;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:500px;width:100%;text-align:center;position:relative}
+    h2{font-size:28px;margin-top:0;color:#ff007f}
     
     .course-list-box{background:#2a2a2a;border:1px solid #444;border-radius:12px;padding:12px;margin:15px 0;text-align:left}
     .course-list-title{font-size:16px;font-weight:700;color:#00d2ff;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
@@ -165,9 +96,6 @@
 </head>
 <body>
 
-<!-- Three.js 雲海背景畫布容器 -->
-<div class="container" id="container"></div>
-
 <div id="idleWarningBox" class="idle-warning-box">
   ⚠️ 檢測到閒置！系統即將於 <span id="idleCountdownSec" style="font-size:32px;text-decoration:underline;color:#fff;">5</span> 秒後自動退出管理者模式！<br>
   <span style="font-size:14px;opacity:.9">(請點擊或觸碰畫面任意處繼續使用)</span>
@@ -183,8 +111,8 @@
   </div>
 </div>
 
-<div class="card-container" id="cardContainer">
-  <h2 id="cardHeader">&lt;文舞集&gt;簽到</h2>
+<div class="card-container">
+  <h2>&lt;文舞集&gt;簽到</h2>
 
   <div class="course-list-box">
     <div class="course-list-title">
@@ -292,172 +220,6 @@
   </div>
 </div>
 
-<!-- Three.js 雲海背景動畫指令碼 -->
-<script type="module">
-  import * as THREE from "three";
-  import * as BufferGeometryUtils from "addons/utils/BufferGeometryUtils.js";
-
-  const cloudShader = {
-    vertexShader: `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-      }
-    `,
-    fragmentShader: `
-      uniform sampler2D map;
-      uniform vec3 fogColor;
-      uniform float fogNear;
-      uniform float fogFar;
-      varying vec2 vUv;
-
-      void main() {
-        float depth = gl_FragCoord.z / gl_FragCoord.w;
-        float fogFactor = smoothstep( fogNear, fogFar, depth );
-
-        gl_FragColor = texture2D( map, vUv );
-        gl_FragColor.w *= pow( gl_FragCoord.z, 20.0 );
-        gl_FragColor = mix( gl_FragColor, vec4( fogColor , gl_FragColor.w ), fogFactor );
-      }
-    `
-  };
-
-  const container = document.querySelector(".container");
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(
-    30,
-    window.innerWidth / window.innerHeight,
-    1,
-    3000
-  );
-  const renderer = new THREE.WebGLRenderer({
-    antialias: false,
-    alpha: true
-  });
-
-  let mesh, geometry, material;
-  let position;
-
-  var mouseX = 0,
-    mouseY = 0;
-  var start_time = Date.now();
-
-  var windowHalfX = window.innerWidth / 2;
-  var windowHalfY = window.innerHeight / 2;
-
-  var tLoader = new THREE.TextureLoader();
-
-  tLoader.load(
-    "https://mrdoob.com/lab/javascript/webgl/clouds/cloud10.png",
-    (t) => {
-      t.colorSpace = THREE.SRGBColorSpace;
-      init(t);
-    }
-  );
-
-  function init(t) {
-    var canvas = document.createElement("canvas");
-    canvas.width = 32;
-    canvas.height = window.innerHeight;
-
-    var context = canvas.getContext("2d");
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    container.style.background = "url(" + canvas.toDataURL("image/png") + ")";
-    container.style.backgroundSize = "32px 100%";
-
-    camera.position.z = 6000;
-
-    geometry = new THREE.BufferGeometry();
-
-    var texture = t;
-    texture.magFilter = THREE.LinearMipMapLinearFilter;
-    texture.minFilter = THREE.LinearMipMapLinearFilter;
-
-    var fog = new THREE.Fog(0x4584b4, -100, 3000);
-    scene.fog = fog;
-
-    material = new THREE.ShaderMaterial({
-      uniforms: {
-        map: { type: "t", value: texture },
-        fogColor: { type: "c", value: fog.color },
-        fogNear: { type: "f", value: fog.near },
-        fogFar: { type: "f", value: fog.far }
-      },
-      vertexShader: cloudShader.vertexShader,
-      fragmentShader: cloudShader.fragmentShader,
-      depthWrite: false,
-      depthTest: false,
-      transparent: true
-    });
-
-    const planeGeo = new THREE.PlaneGeometry(64, 64);
-    var planeObj = new THREE.Object3D();
-    const geometries = [];
-
-    for (var i = 0; i < 8000; i++) {
-      planeObj.position.x = Math.random() * 1000 - 500;
-      planeObj.position.y = -Math.random() * Math.random() * 200 - 15;
-      planeObj.position.z = i;
-      planeObj.rotation.z = Math.random() * Math.PI;
-      planeObj.scale.x = planeObj.scale.y =
-        Math.random() * Math.random() * 1.5 + 0.5;
-      planeObj.updateMatrix();
-
-      const clonedPlaneGeo = planeGeo.clone();
-      clonedPlaneGeo.applyMatrix4(planeObj.matrix);
-      geometries.push(clonedPlaneGeo);
-    }
-
-    const planeGeos = BufferGeometryUtils.mergeGeometries(geometries);
-    const planesMesh = new THREE.Mesh(planeGeos, material);
-    planesMesh.renderOrder = 2;
-
-    const planesMeshA = planesMesh.clone();
-    planesMeshA.position.z = -8000;
-    planesMeshA.renderOrder = 1;
-
-    scene.add(planesMesh);
-    scene.add(planesMeshA);
-
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    container.appendChild(renderer.domElement);
-
-    document.addEventListener("mousemove", onDocumentMouseMove, false);
-    window.addEventListener("resize", onWindowResize, false);
-
-    animate();
-  }
-
-  function onDocumentMouseMove(event) {
-    mouseX = (event.clientX - windowHalfX) * 0.25;
-    mouseY = (event.clientY - windowHalfY) * 0.15;
-  }
-
-  function onWindowResize(event) {
-    windowHalfX = window.innerWidth / 2;
-    windowHalfY = window.innerHeight / 2;
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  }
-
-  function animate() {
-    requestAnimationFrame(animate);
-
-    position = ((Date.now() - start_time) * 0.03) % 8000;
-
-    camera.position.x += (mouseX - camera.position.x) * 0.01;
-    camera.position.y += (-mouseY - camera.position.y) * 0.01;
-    camera.position.z = -position + 8000;
-
-    renderer.render(scene, camera);
-  }
-</script>
-
-<!-- 原簽到系統邏輯與滑鼠拖曳互動功能 -->
 <script>
   const GAS_WEB_APP_URL="https://script.google.com/macros/s/AKfycbxh-0Xq4bF3sPYwwI-H6MjpN2ZjY3Jp1_ZfQN2TBrzNqGPj2P0MjudeHG2DYsQE4oytEg/exec";
   const displayWindow=document.getElementById("displayWindow"),adminPanel=document.getElementById("adminPanel"),adminTargetCard=document.getElementById("adminTargetCard"),cardStatusBadge=document.getElementById("cardStatusBadge"),confirmBox=document.getElementById("confirmBox"),confirmMsg=document.getElementById("confirmMsg"),sectionNewCard=document.getElementById("sectionNewCard"),sectionAddPoints=document.getElementById("sectionAddPoints"),replaceSection=document.getElementById("replaceSection"),idleWarningBox=document.getElementById("idleWarningBox"),idleCountdownSec=document.getElementById("idleCountdownSec"),btnViewStudents=document.getElementById("btnViewStudents");
@@ -465,6 +227,7 @@
   let isScanning=!1,isAdminMode=!1,isReplaceMode=!1,currentScannedCardForAdmin="",pendingCardId="",targetReplaceUser=null,autoResetTimer=null,adminIdleTimer=null,adminCountdownInterval=null,countdownSeconds=5,audioCtx=null;
   let activeCourseInfo="",activeCourseName="";
 
+  // 電腦模擬鍵盤輸入 (刷卡機 / 讀卡機 / 條碼槍) 相關變數
   let keyboardBuffer = "";
   let keyboardTimer = null;
 
@@ -472,47 +235,12 @@
     fetchTodayCourses();
     initMonthDropdown();
     initKeyboardScanListener();
-    initCardDragging();
   });
 
-  // 實作主卡片滑鼠拖曳功能
-  function initCardDragging() {
-    const card = document.getElementById("cardContainer");
-    const header = document.getElementById("cardHeader");
-    let isDragging = false;
-    let startX, startY, initialLeft, initialTop;
-
-    header.addEventListener("mousedown", (e) => {
-      isDragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      
-      const rect = card.getBoundingClientRect();
-      card.style.transform = "none";
-      card.style.left = rect.left + "px";
-      card.style.top = rect.top + "px";
-      
-      initialLeft = rect.left;
-      initialTop = rect.top;
-      
-      e.preventDefault();
-    });
-
-    window.addEventListener("mousemove", (e) => {
-      if (!isDragging) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      card.style.left = (initialLeft + dx) + "px";
-      card.style.top = (initialTop + dy) + "px";
-    });
-
-    window.addEventListener("mouseup", () => {
-      isDragging = false;
-    });
-  }
-
+  // 全域鍵盤監聽，收集電腦模擬鍵盤輸入的卡號 (預設以 Enter 鍵為結束字元)
   function initKeyboardScanListener() {
     window.addEventListener("keydown", (e) => {
+      // 若使用者正在輸入框內打字（如：搜尋學員姓名、設定日期等），則不攔截
       const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
       if (tag === "input" || tag === "select" || tag === "textarea") {
         return;
@@ -524,9 +252,10 @@
           keyboardBuffer = "";
           handleCardInput(scannedCode);
         }
-      } else if (e.key.length === 1) {
+      } else if (e.key.length === 1) { // 僅收集單一文字/數字字元
         keyboardBuffer += e.key;
         if (keyboardTimer) clearTimeout(keyboardTimer);
+        // 若超過 500ms 未繼續輸入則清空緩衝區，避免人工慢速輸入誤觸
         keyboardTimer = setTimeout(() => {
           keyboardBuffer = "";
         }, 500);
@@ -534,6 +263,7 @@
     });
   }
 
+  // 處理讀取到的卡號
   async function handleCardInput(cardId) {
     if (isAdminMode) {
       resetAdminIdleTimer();
