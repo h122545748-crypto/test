@@ -5,49 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><文舞集>簽到</title>
   <style>
-    /* ===== 基礎頁面與 3D 畫布設定 ===== */
-    *{box-sizing:border-box}
-    html, body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #10151c;
-      color: #fff;
-    }
-    #worldCanvas {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 1;
-      display: block;
-    }
-
-    /* ===== UI 元件與互動面板 ===== */
-    .card-container{
-      position: fixed;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 40;
-      background: rgba(30, 30, 30, 0.9);
-      backdrop-filter: blur(14px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      padding: 24px;
-      border-radius: 20px;
-      box-shadow: 0 18px 55px rgba(0,0,0,.62);
-      max-width: 440px;
-      width: min(440px, calc(100vw - 24px));
-      max-height: calc(100vh - 40px);
-      overflow: auto;
-      text-align: center;
-      resize: none;
-    }
-    .card-container.is-dragging{cursor:grabbing;}
-
+    *{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background-color:#121212;color:#fff;margin:0;padding:15px;display:flex;justify-content:center;align-items:center;min-height:100vh}
+    .card-container{background:#1e1e1e;padding:24px;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:500px;width:100%;text-align:center;position:relative}
     h2{font-size:28px;margin-top:0;color:#ff007f}
     
     .course-list-box{background:#2a2a2a;border:1px solid #444;border-radius:12px;padding:12px;margin:15px 0;text-align:left}
@@ -133,47 +92,9 @@
     .badge-count{background:#00d2ff;color:#000;font-weight:700;padding:2px 6px;border-radius:10px;font-size:12px}
     .student-tag{display:inline-block;background:#333;color:#e0e0e0;padding:2px 6px;border-radius:4px;margin:2px;font-size:12px;border:1px solid #444}
     .btn-view-students{background:#00b0ff;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:700;font-size:16px;width:100%;margin-top:12px;cursor:pointer;display:none}
-
-    /* ===== Three.js HUD 與控制列 ===== */
-    .scene-hud{position:fixed;right:18px;bottom:18px;z-index:30;min-width:235px;padding:14px 16px;border-radius:16px;background:rgba(8,15,22,.68);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.18);box-shadow:0 10px 35px rgba(0,0,0,.35);color:#fff;text-align:left;user-select:none}
-    .scene-hud .hud-title{font-size:13px;color:#9de7ff;margin-bottom:7px;font-weight:800;letter-spacing:.06em}
-    .scene-hud .hud-main{font-size:19px;font-weight:900;line-height:1.25}
-    .scene-hud .hud-sub{font-size:13px;color:#d7e0e8;margin-top:3px}
-    .scene-controls{margin-top:10px;display:grid;gap:7px}
-    .scene-controls label{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:#d9e2ea}
-    .scene-controls input[type=range]{width:125px;accent-color:#00d2ff}
-    .scene-controls output{display:inline-block;min-width:42px;text-align:right;font-weight:800;color:#fff}
-    .world-overlay{position:fixed;left:18px;bottom:18px;z-index:30;display:flex;align-items:center;gap:8px;flex-wrap:wrap;pointer-events:none}
-    .world-pill{padding:8px 11px;border-radius:999px;background:rgba(0,0,0,.48);border:1px solid rgba(255,255,255,.14);font-size:12px;color:#eef6fb;backdrop-filter:blur(8px)}
-    
-    .panel-drag-handle{display:flex;align-items:center;justify-content:center;gap:8px;height:30px;margin:-8px -8px 8px;border-radius:9px;color:#7f8b96;font-size:11px;cursor:grab;user-select:none;letter-spacing:.08em}
-    .panel-drag-handle::before{content:'⋮⋮⋮';font-size:13px;opacity:.8}
-    .panel-resize-handle{position:absolute;right:4px;bottom:4px;width:18px;height:18px;cursor:nwse-resize;border-radius:5px;background:linear-gradient(135deg,transparent 0 30%,rgba(255,255,255,.55) 31% 40%,transparent 41% 55%,rgba(255,255,255,.55) 56% 65%,transparent 66%)}
-    
-    @media (max-width:900px){
-      .scene-hud{right:8px;bottom:8px;min-width:205px}
-      .world-overlay{left:8px;bottom:8px}
-      .world-pill{font-size:11px;padding:7px 9px}
-    }
   </style>
 </head>
 <body>
-
-<canvas id="worldCanvas"></canvas>
-<div class="world-overlay">
-  <div class="world-pill" id="weatherPill">☀️ 晴天</div>
-  <div class="world-pill" id="seasonPill">🌱 春季</div>
-  <div class="world-pill" id="trafficPill">🚗 公路運行中</div>
-</div>
-<div class="scene-hud" id="sceneHud">
-  <div class="hud-title">ENVIRONMENT MONITOR</div>
-  <div class="hud-main" id="hudTime">白天 · 12:00</div>
-  <div class="hud-sub" id="hudSeasonWeather">春季 · 晴天</div>
-  <div class="scene-controls">
-    <label>日夜週期 <input id="dayNightRange" type="range" min="10" max="60" step="1" value="30"><output id="dayNightValue">30 秒</output></label>
-    <label>季節週期 <input id="seasonRange" type="range" min="30" max="120" step="1" value="120"><output id="seasonValue">120 秒</output></label>
-  </div>
-</div>
 
 <div id="idleWarningBox" class="idle-warning-box">
   ⚠️ 檢測到閒置！系統即將於 <span id="idleCountdownSec" style="font-size:32px;text-decoration:underline;color:#fff;">5</span> 秒後自動退出管理者模式！<br>
@@ -191,7 +112,6 @@
 </div>
 
 <div class="card-container">
-  <div class="panel-drag-handle" id="panelDragHandle" title="拖曳移動打卡欄">拖曳移動面板</div>
   <h2>&lt;文舞集&gt;簽到</h2>
 
   <div class="course-list-box">
@@ -298,7 +218,6 @@
 
     <button class="btn-admin-act btn-close-admin" onclick="closeAdminPanel()">退出管理者模式 (恢復打卡扣點)</button>
   </div>
-  <div class="panel-resize-handle" id="panelResizeHandle" title="拖曳改變面板大小"></div>
 </div>
 
 <script>
@@ -308,6 +227,7 @@
   let isScanning=!1,isAdminMode=!1,isReplaceMode=!1,currentScannedCardForAdmin="",pendingCardId="",targetReplaceUser=null,autoResetTimer=null,adminIdleTimer=null,adminCountdownInterval=null,countdownSeconds=5,audioCtx=null;
   let activeCourseInfo="",activeCourseName="";
 
+  // 電腦模擬鍵盤輸入 (刷卡機 / 讀卡機 / 條碼槍) 相關變數
   let keyboardBuffer = "";
   let keyboardTimer = null;
 
@@ -317,8 +237,10 @@
     initKeyboardScanListener();
   });
 
+  // 全域鍵盤監聽，收集電腦模擬鍵盤輸入的卡號 (預設以 Enter 鍵為結束字元)
   function initKeyboardScanListener() {
     window.addEventListener("keydown", (e) => {
+      // 若使用者正在輸入框內打字（如：搜尋學員姓名、設定日期等），則不攔截
       const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
       if (tag === "input" || tag === "select" || tag === "textarea") {
         return;
@@ -330,9 +252,10 @@
           keyboardBuffer = "";
           handleCardInput(scannedCode);
         }
-      } else if (e.key.length === 1) {
+      } else if (e.key.length === 1) { // 僅收集單一文字/數字字元
         keyboardBuffer += e.key;
         if (keyboardTimer) clearTimeout(keyboardTimer);
+        // 若超過 500ms 未繼續輸入則清空緩衝區，避免人工慢速輸入誤觸
         keyboardTimer = setTimeout(() => {
           keyboardBuffer = "";
         }, 500);
@@ -340,6 +263,7 @@
     });
   }
 
+  // 處理讀取到的卡號
   async function handleCardInput(cardId) {
     if (isAdminMode) {
       resetAdminIdleTimer();
@@ -827,116 +751,5 @@
     }
   }
 </script>
-
-<script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js';
-import { Sky } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/objects/Sky.js';
-
-const canvas=document.getElementById('worldCanvas');
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.setSize(innerWidth,innerHeight,false);
-renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-renderer.outputColorSpace=THREE.SRGBColorSpace;
-
-const scene=new THREE.Scene();
-scene.fog=new THREE.Fog(0x8bb5c9,90,420);
-const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,1000);
-camera.position.set(94,72,108);
-const controls=new OrbitControls(camera,renderer.domElement);
-controls.enableDamping=true; controls.dampingFactor=.06;
-controls.maxPolarAngle=Math.PI*.46; controls.minDistance=70; controls.maxDistance=210;
-controls.target.set(0,4,0);
-
-const hemi=new THREE.HemisphereLight(0xbfe9ff,0x425036,1.1); scene.add(hemi);
-const sunLight=new THREE.DirectionalLight(0xffffff,2.0); sunLight.position.set(55,85,25); sunLight.castShadow=true; sunLight.shadow.mapSize.set(2048,2048); scene.add(sunLight);
-const sky=new Sky(); sky.scale.setScalar(450); scene.add(sky);
-sky.material.uniforms.turbidity.value=7; sky.material.uniforms.rayleigh.value=1.9; sky.material.uniforms.mieCoefficient.value=.008; sky.material.uniforms.mieDirectionalG.value=.8;
-const sun=new THREE.Vector3();
-
-const world=new THREE.Group(); scene.add(world);
-const rng=(a,b)=>a+Math.random()*(b-a);
-const pick=a=>a[Math.floor(Math.random()*a.length)];
-const seasonNames=['春季','夏季','秋季','冬季'];
-const weatherNames={spring:['晴天','多雲'],summer:['晴天','暴雨'],autumn:['晴天','多雲'],winter:['降雪','陰天']};
-let dayNightSeconds=30,seasonSeconds=120,startTime=performance.now(),lastTraffic=0,nextTraffic=rng(5,10),seasonIndex=0,weather='晴天';
-const forest=new THREE.Group(), animals=new THREE.Group(), vehicles=new THREE.Group(), effects=new THREE.Group();
-world.add(forest,animals,vehicles,effects);
-
-function mat(c){return new THREE.MeshStandardMaterial({color:c,roughness:.9});}
-function addBox(parent,size,pos,color,rotY=0){const m=new THREE.Mesh(new THREE.BoxGeometry(...size),mat(color));m.position.set(...pos);m.rotation.y=rotY;m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
-function makeTree(x,z,h=8){const g=new THREE.Group(); const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.55,.8,h*.38,8),mat(pick([0x5b371d,0x6e4728,0x7a512e])));trunk.position.y=h*.19;trunk.castShadow=true;g.add(trunk);const c=new THREE.Mesh(new THREE.SphereGeometry(h*.22,10,8),mat(pick([0x1f6b2a,0x2d8731,0x3f9c3a,0x255522])));c.scale.y=1.45;c.position.y=h*.55;c.castShadow=true;g.add(c);const c2=c.clone();c2.scale.multiplyScalar(.72);c2.position.set(.55,h*.68,.25);g.add(c2);g.position.set(x,0,z);forest.add(g);return g;}
-for(let i=0;i<50;i++){const side=i%2? -1:-1; const z=-105+i*4.5+rng(-2,2); const x=-42+rng(-11,10); makeTree(x,z,rng(5,14));}
-
-addBox(world,[190,.8,210],[0,-.7,0],0x6b9b45);
-for(let i=0;i<14;i++) addBox(world,[25,rng(2,7),18],[-12+rng(-20,20),rng(1,3),-85+i*13],pick([0x557f39,0x628b3a,0x729845]));
-for(const p of [[18,0,-75,22,11],[5,0,-95,28,15],[28,0,-118,35,18]]){const [x,y,z,w,h]=p; const hill=new THREE.Mesh(new THREE.SphereGeometry(1,24,14),mat(0x527b42)); hill.scale.set(w,h,w*.55); hill.position.set(x,y+h*.28,z); hill.castShadow=true;world.add(hill);}
-const road=new THREE.Mesh(new THREE.PlaneGeometry(24,270),mat(0x3b4146));road.rotation.x=-Math.PI/2;road.rotation.z=-.48;road.position.set(2,.05,0);road.receiveShadow=true;world.add(road);
-for(let i=-9;i<10;i++){const line=new THREE.Mesh(new THREE.BoxGeometry(.9,.06,10),mat(0xf2e3a3));line.position.set(0,.09,i*14);line.rotation.y=-.48; world.add(line);}
-const pond=new THREE.Mesh(new THREE.CircleGeometry(16,64),new THREE.MeshStandardMaterial({color:0x3d94b0,transparent:true,opacity:.88,roughness:.15,metalness:.08}));pond.rotation.x=-Math.PI/2;pond.position.set(38,.12,18);world.add(pond);
-
-for(let i=0;i<220;i++){const x=rng(8,88),z=rng(-75,95); if(Math.abs(x)<9)continue; const g=new THREE.Mesh(new THREE.ConeGeometry(.06,.5,4),mat(pick([0x2e6f29,0x3e8b35,0x5b9c41])));g.position.set(x,.2,z);world.add(g);}
-
-function makeAnimal(type){const colors={cow:0xf2eee4,zebra:0xeaeaea,antelope:0xb27a3f,deer:0x9d6a43};const g=new THREE.Group(); const body=new THREE.Mesh(new THREE.BoxGeometry(3.1,1.35,1.2),mat(colors[type]));body.position.y=2.1;body.castShadow=true;g.add(body); const head=new THREE.Mesh(new THREE.BoxGeometry(1.05,1,1),mat(colors[type]));head.position.set(1.8,2.55,0);head.castShadow=true;g.add(head); for(const sx of [-.9,.9])for(const sz of [-.38,.38])addBox(g,[.28,1.3,.28],[sx,1.35,sz],0x3b3027); return g;}
-const animalTypes=['cow','cow','zebra','zebra','antelope','antelope','deer'];
-for(let i=0;i<14;i++){const a=makeAnimal(pick(animalTypes));a.position.set(rng(13,84),0,rng(-65,88));a.userData.baseX=a.position.x;a.userData.baseZ=a.position.z;a.userData.speed=rng(.6,1.4);animals.add(a);}
-
-function makeCar(){const g=new THREE.Group(); const c=pick([0xd11a2a,0x1676d2,0xf0b323,0x23a46b,0x9b45d6,0xf5f5f5,0x222222]);addBox(g,[4,1.25,7],[0,1.15,0],c);addBox(g,[2.9,.9,3.2],[0,2.05,.1],0x80a8b8);for(const z of [-2.2,2.2])for(const x of [-1.75,1.75]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.4,12),mat(0x151515));w.rotation.z=Math.PI/2;w.position.set(x,.55,z);g.add(w);} const lamps=[];for(const x of [-1.35,1.35]){const l=new THREE.SpotLight(0xffffee,8,24,Math.PI/8,.55,1.2);l.position.set(x,1.9,3.4);l.target.position.set(x,-.2,10);g.add(l,l.target);lamps.push(l);}g.userData.lamps=lamps;return g;}
-
-function spawnCar(){const c=makeCar();c.position.set(-52,0,98);c.rotation.y=-.48;c.userData.progress=0;c.userData.speed=rng(12,19);vehicles.add(c);return c;}
-
-const rain=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({color:0x9ed5ff,size:.22,transparent:true,opacity:.8}));
-const snow=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({color:0xffffff,size:.35,transparent:true,opacity:.9}));
-function fillParticles(points,count){const arr=[];for(let i=0;i<count;i++)arr.push(rng(-90,90),rng(4,85),rng(-110,110));points.geometry.setAttribute('position',new THREE.Float32BufferAttribute(arr,3));points.visible=false;effects.add(points);}
-fillParticles(rain,1200);fillParticles(snow,800);
-
-const santa=new THREE.Group();
-santa.visible=false; const sleigh=addBox(santa,[7,1.2,2.2],[0,0,0],0x7a1111);for(const x of [-2.5,-1.3,1.3,2.5]){const ant=addBox(santa,[.35,1.1,.35],[x,1.1,0],0x8a5d2f);addBox(santa,[1.2,.35,.5],[x,1.9,0],0x6a461f);}santa.position.set(-110,55,-120);effects.add(santa);
-
-function setSeason(i){seasonIndex=i; weather=pick(weatherNames[seasonNames[i].toLowerCase().replace('季','').replace('春','spring').replace('夏','summer').replace('秋','autumn').replace('冬','winter')]||['晴天']); if(i===0){sunLight.color.setHex(0xfff2d6)} if(i===1){sunLight.color.setHex(0xffffff)} if(i===2){sunLight.color.setHex(0xffd3a0)} if(i===3){sunLight.color.setHex(0xd9e7ff)}}
-function seasonalVisual(){const i=seasonIndex; const ground=world.children[0]; if(i===0)ground.material.color.setHex(0x6b9b45);if(i===1)ground.material.color.setHex(0x5e913d);if(i===2)ground.material.color.setHex(0x8a8244);if(i===3)ground.material.color.setHex(0xcdd4d6); for(const t of forest.children){const crown=t.children[1]; if(i===2)crown.material.color.setHex(pick([0x9d6b20,0xb17c26,0x7b5520])); else if(i===3)crown.material.color.setHex(0x96a3aa); else crown.material.color.setHex(pick([0x1f6b2a,0x2d8731,0x3f9c3a]));}}
-
-function updateEnvironment(now){
-  const elapsed=(now-startTime)/1000; const cycle=elapsed%dayNightSeconds; const daylight=.5+.5*Math.sin((cycle/dayNightSeconds)*Math.PI*2-Math.PI/2); const theta=(daylight)*Math.PI;
-  sun.set(Math.cos((cycle/dayNightSeconds)*Math.PI*2)*80,Math.max(8,Math.sin((cycle/dayNightSeconds)*Math.PI*2)*70),-40); sky.material.uniforms.sunPosition.value.copy(sun);
-  sunLight.position.copy(sun);sunLight.intensity=.15+2.1*Math.max(0,daylight);hemi.intensity=.22+.95*daylight;
-  scene.fog.color.lerp(new THREE.Color(daylight>.45?0x8bb5c9:0x152033),.06);scene.background=scene.fog.color;
-  const s=Math.floor(((elapsed%seasonSeconds)/seasonSeconds)*4); if(s!==seasonIndex){setSeason(s);seasonalVisual();}
-  const dark=daylight<.35; for(const v of vehicles.children)for(const l of (v.userData.lamps||[]))l.visible=dark;
-  const currentWeather=seasonNames[seasonIndex]==='夏季'&&weather==='暴雨'; rain.visible=currentWeather; snow.visible=seasonNames[seasonIndex]==='冬季';
-  santa.visible=seasonNames[seasonIndex]==='冬季';
-  document.getElementById('hudTime').textContent=(dark?'🌙 黑夜':'☀️ 白天')+' · '+new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  document.getElementById('hudSeasonWeather').textContent=`${seasonNames[seasonIndex]} · ${weather}`;
-  document.getElementById('weatherPill').textContent=(weather==='晴天'?'☀️':weather==='暴雨'?'🌧️':weather==='降雪'?'❄️':'☁️')+' '+weather;
-  document.getElementById('seasonPill').textContent=['🌱','☀️','🍂','❄️'][seasonIndex]+' '+seasonNames[seasonIndex];
-  if(now-lastTraffic>nextTraffic*1000){spawnCar();lastTraffic=now;nextTraffic=rng(5,10)}
-}
-
-function animate(now){requestAnimationFrame(animate);updateEnvironment(now);for(const a of animals.children){a.userData.baseZ+=Math.sin(now*.00025*a.userData.speed)*.018;a.position.z+=Math.sin(now*.00018*a.userData.speed)*.035;a.position.x+=Math.cos(now*.00014*a.userData.speed)*.025;if(a.position.x<13)a.position.x=13;if(a.position.x>84)a.position.x=84;}for(const v of [...vehicles.children]){v.userData.progress+=(v.userData.speed*.016);v.position.z-=v.userData.speed*.016;v.position.x-=v.userData.speed*.010;if(v.position.z<-150){vehicles.remove(v);}}if(santa.visible){santa.position.x+=.12;santa.position.z+=.05;if(santa.position.x>120)santa.position.x=-120;}controls.update();renderer.render(scene,camera);}
-animate(performance.now());
-
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false)});
-const dn=document.getElementById('dayNightRange'),dnv=document.getElementById('dayNightValue'),sr=document.getElementById('seasonRange'),srv=document.getElementById('seasonValue');
-dn.addEventListener('input',e=>{dayNightSeconds=+e.target.value;dnv.textContent=dayNightSeconds+' 秒';});sr.addEventListener('input',e=>{seasonSeconds=+e.target.value;srv.textContent=seasonSeconds+' 秒';});
-
-const panel=document.querySelector('.card-container'),drag=document.getElementById('panelDragHandle'),resize=document.getElementById('panelResizeHandle');
-const key='wenwujii_checkin_panel_v1'; let saved={};try{saved=JSON.parse(localStorage.getItem(key)||'{}')}catch{}
-function applySaved(){if(saved.x!=null){panel.style.left=saved.x+'px';panel.style.top=saved.y+'px';panel.style.transform='none'}if(saved.w)panel.style.width=saved.w+'px';if(saved.h)panel.style.height=saved.h+'px';}
-function save(){localStorage.setItem(key,JSON.stringify({x:parseFloat(panel.style.left)||panel.getBoundingClientRect().left,y:parseFloat(panel.style.top)||panel.getBoundingClientRect().top,w:panel.offsetWidth,h:panel.offsetHeight}));}
-applySaved();
-
-let dragState=null;
-drag.addEventListener('pointerdown',e=>{drag.setPointerCapture(e.pointerId);const r=panel.getBoundingClientRect();dragState={sx:e.clientX,sy:e.clientY,x:r.left,y:r.top};panel.classList.add('is-dragging')});
-drag.addEventListener('pointermove',e=>{if(!dragState)return;panel.style.left=(dragState.x+e.clientX-dragState.sx)+'px';panel.style.top=(dragState.y+e.clientY-dragState.sy)+'px';panel.style.transform='none'});
-drag.addEventListener('pointerup',()=>{if(dragState){dragState=null;panel.classList.remove('is-dragging');save()}});
-
-let rs=null;
-resize.addEventListener('pointerdown',e=>{resize.setPointerCapture(e.pointerId);const r=panel.getBoundingClientRect();rs={sx:e.clientX,sy:e.clientY,w:r.width,h:r.height}});
-resize.addEventListener('pointermove',e=>{if(!rs)return;panel.style.width=Math.max(320,rs.w+e.clientX-rs.sx)+'px';panel.style.height=Math.max(260,rs.h+e.clientY-rs.sy)+'px'});
-resize.addEventListener('pointerup',()=>{if(rs){rs=null;save()}});
-</script>
-
 </body>
 </html>
