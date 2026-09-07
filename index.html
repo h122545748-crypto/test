@@ -4,10 +4,86 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><文舞集>簽到</title>
+  
+  <!-- 引入 Three.js 用於背景 WebGL 特效 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
   <style>
-    *{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background-color:#121212;color:#fff;margin:0;padding:15px;display:flex;justify-content:center;align-items:center;min-height:100vh}
-    .card-container{background:#1e1e1e;padding:24px;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:500px;width:100%;text-align:center;position:relative}
-    h2{font-size:28px;margin-top:0;color:#ff007f}
+    *{box-sizing:border-box}
+    
+    /* 調整 body，不再侷限置中，改為滿版且支援 WebGL 背景顯示 */
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      background-color:#121212;
+      color:#fff;
+      margin:0;
+      padding:15px;
+      min-height:100vh;
+      overflow-x:hidden;
+      position:relative;
+    }
+
+    /* WebGL 背景相關樣式 */
+    #canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -1;
+      pointer-events: none;
+    }
+    .clean-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(30, 30, 30, 0.8);
+      border: 1px solid #444;
+      color: #aaa;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      z-index: 1000;
+      transition: all 0.2s;
+    }
+    .clean-btn:hover {
+      background: #ff007f;
+      color: #fff;
+      border-color: #ff007f;
+    }
+
+    /* 可拖曳與改變大小的視窗容器 (支援滑鼠操作) */
+    .card-container{
+      background:rgba(30,30,30,0.92);
+      backdrop-filter: blur(10px);
+      padding:24px;
+      border-radius:20px;
+      box-shadow:0 10px 30px rgba(0,0,0,.5);
+      width: 500px;
+      max-width: 100%;
+      text-align:center;
+      position:absolute;
+      top: 50px;
+      left: 50px;
+      resize: both;
+      overflow: auto;
+      min-width: 320px;
+      min-height: 400px;
+      z-index: 10;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    /* 可拖曳標題列樣式 */
+    .drag-header {
+      cursor: move;
+      user-select: none;
+      padding-bottom: 5px;
+      margin-bottom: 10px;
+      border-bottom: 1px dashed rgba(255,255,255,0.1);
+    }
+
+    h2{font-size:28px;margin-top:0;color:#ff007f;margin-bottom:0}
     
     .course-list-box{background:#2a2a2a;border:1px solid #444;border-radius:12px;padding:12px;margin:15px 0;text-align:left}
     .course-list-title{font-size:16px;font-weight:700;color:#00d2ff;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
@@ -96,6 +172,10 @@
 </head>
 <body>
 
+<!-- WebGL 背景與清理按鈕 -->
+<canvas id="canvas"></canvas>
+<div class="clean-btn">clean the screen</div>
+
 <div id="idleWarningBox" class="idle-warning-box">
   ⚠️ 檢測到閒置！系統即將於 <span id="idleCountdownSec" style="font-size:32px;text-decoration:underline;color:#fff;">5</span> 秒後自動退出管理者模式！<br>
   <span style="font-size:14px;opacity:.9">(請點擊或觸碰畫面任意處繼續使用)</span>
@@ -111,8 +191,12 @@
   </div>
 </div>
 
-<div class="card-container">
-  <h2>&lt;文舞集&gt;簽到</h2>
+<!-- 可拖曳與調整大小的簽到主卡片容器 -->
+<div class="card-container" id="cardContainer">
+  <div class="drag-header" id="dragHeader">
+    <h2>&lt;文舞集&gt;簽到</h2>
+    <div style="font-size:11px; color:#888; margin-top:2px;">(可按住此處拖曳視窗，或透過右下角調整大小)</div>
+  </div>
 
   <div class="course-list-box">
     <div class="course-list-title">
@@ -220,6 +304,86 @@
   </div>
 </div>
 
+<!-- GLSL Shaders 用於 WebGL Flower Cursor 背景特效 -->
+<script type="x-shader/x-fragment" id="fragmentShader">
+    #define PI 3.14159265359
+
+    uniform float u_ratio;
+    uniform float u_moving;
+    uniform float u_stop_time;
+    uniform float u_speed;
+    uniform vec2 u_stop_randomizer;
+    uniform float u_clean;
+    uniform vec2 u_point;
+    uniform sampler2D u_texture;
+    varying vec2 vUv;
+
+    float rand(vec2 n) {
+        return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
+    }
+    float noise(vec2 n) {
+        const vec2 d = vec2(0., 1.);
+        vec2 b = floor(n), f = smoothstep(vec2(0.), vec2(1.), fract(n));
+        return mix(mix(rand(b), rand(b + d.yx), f.x), mix(rand(b + d.xy), rand(b + d.yy), f.x), f.y);
+    }
+
+    float flower_shape(vec2 _point, float _size, float _outline, float _tickniess, float _noise, float _angle_offset) {
+        float random_by_uv = noise(vUv);
+
+        float petals_thickness = .5;
+        float petals_number = 5. + floor(u_stop_randomizer[0] * 4.);
+        float angle_animated_offset = .7 * (random_by_uv - .5) / (1. + 30. * u_stop_time);
+        float flower_angle = atan(_point.y, _point.x) - angle_animated_offset;
+        float flower_sectoral_shape = abs(sin(flower_angle * .5 * petals_number + _angle_offset)) + _tickniess * petals_thickness;
+
+        vec2 flower_size_range = vec2(4., 18.);
+        float flower_radial_shape = length(_point) * (flower_size_range[0] + flower_size_range[1] * u_stop_randomizer[0]);
+        float radius_noise = sin(flower_angle * 13. + 15. * random_by_uv);
+        flower_radial_shape += _noise * radius_noise;
+
+        float flower_radius_grow = min(20000. * u_stop_time, 1.);
+        flower_radius_grow = 1. / flower_radius_grow;
+
+        float flower_shape = 1. - smoothstep(0., _size * flower_sectoral_shape, _outline * flower_radius_grow * flower_radial_shape);
+        flower_shape *= (1. - u_moving);
+
+        flower_shape *= (1. - step(1., u_stop_time));
+
+        return flower_shape;
+    }
+
+    void main() {
+        vec3 base = texture2D(u_texture, vUv).xyz;
+        vec2 cursor = vUv - u_point.xy;
+        cursor.x *= u_ratio;
+
+        vec3 stem_color = vec3(0., 2., 1.5);
+        float stem_radius = .003 * u_speed * u_moving;
+        float stem_shape = 1. - pow(smoothstep(0., stem_radius, dot(cursor, cursor)), .03);
+        vec3 stem = stem_shape * stem_color;
+
+        vec3 flower_color = vec3(.7 + u_stop_randomizer[1], .8 * u_stop_randomizer[1], 2.9 + u_stop_randomizer[0] * .6);
+        vec3 flower_new = flower_color * flower_shape(cursor, 1., .96, 1., .15, 0.);
+        vec3 flower_mask = 1. - vec3(flower_shape(cursor, 1.05, 1.07, 1., .15, 0.));
+        vec3 flower_mid = vec3(-.6) * flower_shape(cursor, .15, 1., 2., .1, 1.9);
+
+        vec3 color = base * flower_mask + (flower_new + flower_mid + stem);
+        color *= u_clean;
+        color = clamp(color, vec3(.0, .0, .15), vec3(1., 1., .4));
+
+        gl_FragColor = vec4(color, 1.);
+    }
+</script>
+
+<script type="x-shader/x-vertex" id="vertexShader">
+    varying vec2 vUv;
+    void main() {
+        vUv = uv;
+        gl_Position = vec4(position, 1.);
+    }
+</script>
+
+<!-- 主程式與 WebGL 背景互動邏輯 -->
 <script>
   const GAS_WEB_APP_URL="https://script.google.com/macros/s/AKfycbxh-0Xq4bF3sPYwwI-H6MjpN2ZjY3Jp1_ZfQN2TBrzNqGPj2P0MjudeHG2DYsQE4oytEg/exec";
   const displayWindow=document.getElementById("displayWindow"),adminPanel=document.getElementById("adminPanel"),adminTargetCard=document.getElementById("adminTargetCard"),cardStatusBadge=document.getElementById("cardStatusBadge"),confirmBox=document.getElementById("confirmBox"),confirmMsg=document.getElementById("confirmMsg"),sectionNewCard=document.getElementById("sectionNewCard"),sectionAddPoints=document.getElementById("sectionAddPoints"),replaceSection=document.getElementById("replaceSection"),idleWarningBox=document.getElementById("idleWarningBox"),idleCountdownSec=document.getElementById("idleCountdownSec"),btnViewStudents=document.getElementById("btnViewStudents");
@@ -227,7 +391,6 @@
   let isScanning=!1,isAdminMode=!1,isReplaceMode=!1,currentScannedCardForAdmin="",pendingCardId="",targetReplaceUser=null,autoResetTimer=null,adminIdleTimer=null,adminCountdownInterval=null,countdownSeconds=5,audioCtx=null;
   let activeCourseInfo="",activeCourseName="";
 
-  // 電腦模擬鍵盤輸入 (刷卡機 / 讀卡機 / 條碼槍) 相關變數
   let keyboardBuffer = "";
   let keyboardTimer = null;
 
@@ -235,12 +398,193 @@
     fetchTodayCourses();
     initMonthDropdown();
     initKeyboardScanListener();
+    initDraggableCard();
+    initWebGLBackground();
   });
 
-  // 全域鍵盤監聽，收集電腦模擬鍵盤輸入的卡號 (預設以 Enter 鍵為結束字元)
+  // 實作卡片視窗滑鼠拖曳移動功能
+  function initDraggableCard() {
+    const card = document.getElementById("cardContainer");
+    const header = document.getElementById("dragHeader");
+    let isDragging = false;
+    let startX, startY, initialLeft, initialTop;
+
+    header.addEventListener("mousedown", (e) => {
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      initialLeft = card.offsetLeft;
+      initialTop = card.offsetTop;
+      card.style.position = "absolute";
+      e.preventDefault();
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      card.style.left = `${initialLeft + dx}px`;
+      card.style.top = `${initialTop + dy}px`;
+    });
+
+    window.addEventListener("mouseup", () => {
+      isDragging = false;
+    });
+  }
+
+  // 初始化 WebGL Flower Cursor 背景特效
+  function initWebGLBackground() {
+    const canvasEl = document.querySelector("#canvas");
+    const cleanBtn = document.querySelector(".clean-btn");
+
+    const pointer = {
+        x: .5,
+        y: .65,
+        moved: false,
+        speed: 0,
+        vanishCanvas: false,
+        drawingAllowed: true,
+    };
+    window.setTimeout(() => {
+        pointer.x = .7;
+        pointer.y = .5;
+        pointer.moved = true;
+    }, 400);
+
+    let basicMaterial, shaderMaterial;
+
+    let renderer = new THREE.WebGLRenderer({
+        canvas: canvasEl,
+        alpha: true,
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    let sceneShader = new THREE.Scene();
+    let sceneBasic = new THREE.Scene();
+    let camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
+    let clock = new THREE.Clock();
+
+    let renderTargets = [
+        new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight),
+        new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight)
+    ];
+
+    createPlane();
+    updateSize();
+    window.addEventListener("resize", () => {
+        cleanCanvas();
+        updateSize();
+    });
+
+    render();
+
+    window.addEventListener("mousemove", (e) => {
+        if (pointer.drawingAllowed) {
+            pointer.moved = true;
+            const dx = 12 * (e.pageX / window.innerWidth - pointer.x);
+            const dy = 12 * (e.pageY / window.innerHeight - pointer.y);
+            pointer.x = e.pageX / window.innerWidth;
+            pointer.y = e.pageY / window.innerHeight;
+            pointer.speed = Math.min(2, Math.pow(dx, 2) + Math.pow(dy, 2));
+        }
+    });
+    canvasEl.addEventListener("click", (e) => {
+        pointer.x = e.pageX / window.innerWidth;
+        pointer.y = e.pageY / window.innerHeight;
+        pointer.drawingAllowed = !pointer.drawingAllowed;
+        if (pointer.drawingAllowed) {
+            pointer.moved = true;
+        }
+    });
+    window.addEventListener("touchmove", (e) => {
+        pointer.moved = true;
+        const dx = 5 * (e.targetTouches[0].pageX / window.innerWidth - pointer.x);
+        const dy = 5 * (e.targetTouches[0].pageY / window.innerHeight - pointer.y);
+        pointer.x = e.targetTouches[0].pageX / window.innerWidth;
+        pointer.y = e.targetTouches[0].pageY / window.innerHeight;
+        pointer.speed = Math.min(2, 20 * (Math.pow(dx, 2) + Math.pow(dy, 2)));
+    });
+
+    window.addEventListener("keydown", (e) => {
+        if (e.key === " ") {
+            cleanCanvas();
+        }
+    });
+    cleanBtn.addEventListener("click", cleanCanvas);
+
+    function cleanCanvas() {
+        pointer.vanishCanvas = true;
+        setTimeout(() => {
+            pointer.vanishCanvas = false;
+        }, 50);
+    }
+
+    function createPlane() {
+        shaderMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                u_stop_time: {type: "f", value: 0.},
+                u_point: {type: "v2", value: new THREE.Vector2(pointer.x, pointer.y)},
+                u_moving: {type: "f", value: 0.},
+                u_speed: {type: "f", value: 0.},
+                u_stop_randomizer: {type: "v2", value: new THREE.Vector2(Math.random(), Math.random())},
+                u_clean: {type: "f", value: 1.},
+                u_ratio: {type: "f", value: window.innerWidth / window.innerHeight},
+                u_texture: {type: "t", value: null}
+            },
+            vertexShader: document.getElementById("vertexShader").textContent,
+            fragmentShader: document.getElementById("fragmentShader").textContent
+        });
+        basicMaterial = new THREE.MeshBasicMaterial();
+
+        const planeGeometry = new THREE.PlaneGeometry(2, 2);
+        const planeBasic = new THREE.Mesh(planeGeometry, basicMaterial);
+        const planeShader = new THREE.Mesh(planeGeometry, shaderMaterial);
+        sceneBasic.add(planeBasic);
+        sceneShader.add(planeShader);
+    }
+
+    function render() {
+        shaderMaterial.uniforms.u_clean.value = pointer.vanishCanvas ? 0 : 1;
+        shaderMaterial.uniforms.u_point.value = new THREE.Vector2(pointer.x, 1 - pointer.y);
+        shaderMaterial.uniforms.u_texture.value = renderTargets[0].texture;
+        shaderMaterial.uniforms.u_ratio.value = window.innerWidth / window.innerHeight;
+        if (pointer.moved) {
+            shaderMaterial.uniforms.u_moving.value = 1.;
+            shaderMaterial.uniforms.u_stop_randomizer.value = new THREE.Vector2(Math.random(), Math.random());
+            if (window.innerWidth < 650) {
+                shaderMaterial.uniforms.u_stop_randomizer.value.x *= .2;
+                shaderMaterial.uniforms.u_stop_randomizer.value.x += .8;
+            }
+            shaderMaterial.uniforms.u_stop_time.value = 0.;
+            pointer.moved = false;
+        } else {
+            shaderMaterial.uniforms.u_moving.value = 0.;
+        }
+        shaderMaterial.uniforms.u_stop_time.value += clock.getDelta();
+        shaderMaterial.uniforms.u_speed.value = pointer.speed;
+
+        renderer.setRenderTarget(renderTargets[1]);
+        renderer.render(sceneShader, camera);
+
+        basicMaterial.map = renderTargets[1].texture;
+
+        renderer.setRenderTarget(null);
+        renderer.render(sceneBasic, camera);
+
+        let tmp = renderTargets[0];
+        renderTargets[0] = renderTargets[1];
+        renderTargets[1] = tmp;
+
+        requestAnimationFrame(render);
+    }
+
+    function updateSize() {
+        shaderMaterial.uniforms.u_ratio.value = window.innerWidth / window.innerHeight;
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  }
+
   function initKeyboardScanListener() {
     window.addEventListener("keydown", (e) => {
-      // 若使用者正在輸入框內打字（如：搜尋學員姓名、設定日期等），則不攔截
       const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
       if (tag === "input" || tag === "select" || tag === "textarea") {
         return;
@@ -252,10 +596,9 @@
           keyboardBuffer = "";
           handleCardInput(scannedCode);
         }
-      } else if (e.key.length === 1) { // 僅收集單一文字/數字字元
+      } else if (e.key.length === 1) {
         keyboardBuffer += e.key;
         if (keyboardTimer) clearTimeout(keyboardTimer);
-        // 若超過 500ms 未繼續輸入則清空緩衝區，避免人工慢速輸入誤觸
         keyboardTimer = setTimeout(() => {
           keyboardBuffer = "";
         }, 500);
@@ -263,7 +606,6 @@
     });
   }
 
-  // 處理讀取到的卡號
   async function handleCardInput(cardId) {
     if (isAdminMode) {
       resetAdminIdleTimer();
