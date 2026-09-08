@@ -1,755 +1,679 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
+<!doctype html>
+<html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><文舞集>簽到</title>
-  <style>
-    *{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background-color:#121212;color:#fff;margin:0;padding:15px;display:flex;justify-content:center;align-items:center;min-height:100vh}
-    .card-container{background:#1e1e1e;padding:24px;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:500px;width:100%;text-align:center;position:relative}
-    h2{font-size:28px;margin-top:0;color:#ff007f}
-    
-    .course-list-box{background:#2a2a2a;border:1px solid #444;border-radius:12px;padding:12px;margin:15px 0;text-align:left}
-    .course-list-title{font-size:16px;font-weight:700;color:#00d2ff;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
-    .course-item{display:flex;align-items:center;justify-content:space-between;background:#181818;padding:10px 12px;border-radius:8px;margin-bottom:8px;border:1px solid #333}
-    .course-info-text{font-size:14px;line-height:1.3;flex:1;padding-right:10px}
-    .course-name{font-weight:bold;color:#fff;font-size:15px}
-    .course-sub{font-size:12px;color:#aaa}
-    
-    .status-display{margin-top:15px;padding:25px;border-radius:16px;font-size:20px;font-weight:700;line-height:1.6;text-align:left;min-height:220px;display:flex;flex-direction:column;justify-content:center;word-break:break-all}
-    .theme-standby{background-color:#2a2a2a;color:#aaa;border:2px dashed #555;text-align:center}
-    .theme-waiting{background-color:#1a2332;color:#00d2ff;border:3px solid #00d2ff;animation:breathing-glow 2.5s infinite ease-in-out}
-    @keyframes breathing-glow{0%,100%{opacity:.5;border-color:rgba(0,210,255,.4);box-shadow:0 0 5px rgba(0,210,255,.2)}50%{opacity:1;border-color:#00d2ff;box-shadow:0 0 20px rgba(0,210,255,.8)}}
-    .theme-loading{background-color:#332b00;color:#ffeb3b;position:relative;border:4px solid transparent;border-image:linear-gradient(90deg,#ffcc00,#332b00,#ffcc00,#332b00) 1;animation:marquee-border 1.2s linear infinite}
-    @keyframes marquee-border{0%{border-image:linear-gradient(0deg,#ffcc00 0%,#332b00 50%,#ffcc00 100%) 1}25%{border-image:linear-gradient(90deg,#ffcc00 0%,#332b00 50%,#ffcc00 100%) 1}50%{border-image:linear-gradient(180deg,#ffcc00 0%,#332b00 50%,#ffcc00 100%) 1}75%{border-image:linear-gradient(270deg,#ffcc00 0%,#332b00 50%,#ffcc00 100%) 1}100%{border-image:linear-gradient(360deg,#ffcc00 0%,#332b00 50%,#ffcc00 100%) 1}}
-    .theme-success{background-color:#004d20;color:#00ff66;border:3px solid #00ff66}
-    .theme-error{background-color:#5a0000;color:#ff4d4d;border:3px solid #ff4d4d}
-    .theme-admin{background-color:#4a0072;color:#e040fb;border:3px solid #e040fb}
-    .highlight-val{font-size:28px;font-weight:900;color:#fff}
-
-    .check-icon-blink {
-      color: #ff3333;
-      font-weight: 900;
-      margin-right: 4px;
-      display: inline-block;
-      animation: blink-check 0.8s infinite alternate;
-      text-shadow: 0 0 8px rgba(255, 0, 0, 0.8);
-    }
-    @keyframes blink-check {
-      0% { opacity: 1; transform: scale(1); }
-      100% { opacity: 0.2; transform: scale(1.15); }
-    }
-
-    .history-box{margin-top:12px;padding-top:10px;border-top:1px dashed rgba(255,255,255,.3);font-size:14px;color:#e0e0e0;font-weight:400}
-    .history-title{font-size:15px;font-weight:700;color:#ffeb3b;margin-bottom:6px}
-    .history-item{padding:2px 0;font-family:monospace}
-    .confirm-box{display:none;background:#332b00;border:3px solid #ffcc00;padding:20px;border-radius:16px;margin-top:15px;text-align:center}
-    .confirm-btn-group{display:flex;gap:12px;margin-top:15px}
-    .btn-confirm-no,.btn-confirm-yes{flex:1;color:#fff;border:none;padding:18px;font-size:22px;font-weight:700;border-radius:12px;cursor:pointer}
-    .btn-confirm-yes{background:#28a745}
-    .btn-confirm-no{background:#dc3545}
-    .admin-panel{display:none;margin-top:20px;padding:20px;background:#2c2c2c;border-radius:16px;border:2px solid #e040fb;text-align:left}
-    .admin-panel h3{color:#e040fb;margin-top:0;font-size:22px}
-    .form-group{margin-bottom:12px}
-    .form-group label{display:block;font-size:16px;margin-bottom:5px;color:#ccc}
-    .form-group input,.form-group select{width:100%;padding:12px;font-size:18px;border-radius:8px;border:none;background:#333;color:#fff}
-    .btn-admin-act{background:#e040fb;color:#fff;border:none;padding:12px;font-size:18px;font-weight:700;border-radius:8px;width:100%;margin-top:10px;cursor:pointer}
-    .btn-danger{background:#d32f2f!important}
-    .btn-info{background:#0288d1!important}
-    .btn-warning{background:#f57c00!important}
-    .btn-close-admin{background:#666;margin-top:15px}
-    .admin-section{margin-top:15px;padding-top:15px;border-top:1px solid #444}
-    .log-list{max-height:250px;overflow-y:auto;background:#1e1e1e;border-radius:8px;padding:10px;margin-top:10px;font-size:15px}
-    .log-item{padding:8px 0;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center}
-    .btn-refund{background:#ff9800;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer}
-    .switch-container{display:flex;align-items:center;justify-content:space-between;background:#222;padding:10px 14px;border-radius:8px;margin-top:15px}
-    .switch{position:relative;display:inline-block;width:50px;height:26px}
-    .switch input{opacity:0;width:0;height:0}
-    .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#555;transition:.3s;border-radius:26px}
-    .slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background-color:#fff;transition:.3s;border-radius:50%}
-    input:checked+.slider{background-color:#00ff66}
-    input:checked+.slider:before{transform:translateX(24px)}
-    
-    .idle-warning-box{display:none;position:fixed;top:20px;left:50%;transform:translateX(-50%);width:90%;max-width:460px;background:#ff007f;color:#fff;padding:15px;border-radius:12px;box-shadow:0 0 30px rgba(255,0,127,1);z-index:9999;text-align:center;font-weight:700;animation:pulse-warn .4s infinite alternate}
-    @keyframes pulse-warn{0%{transform:translateX(-50%) scale(1);background:#ff007f;box-shadow:0 0 20px rgba(255,0,127,.8)}100%{transform:translateX(-50%) scale(1.05);background:#ff6600;box-shadow:0 0 40px rgba(255,102,0,1)}}
-
-    .report-modal{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:10000;justify-content:center;align-items:center;padding:12px}
-    .report-content-box{background:#1a1a1a;border:2px solid #00d2ff;border-radius:16px;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 0 25px rgba(0,210,255,0.3)}
-    .report-header{background:linear-gradient(135deg, #2a2a2a, #111);padding:14px 18px;border-bottom:1px solid #444;display:flex;justify-content:space-between;align-items:center}
-    .report-header h4{margin:0;color:#00d2ff;font-size:18px;display:flex;align-items:center;gap:6px}
-    .report-body{padding:12px;overflow-y:auto;color:#fff;line-height:1.4;text-align:left}
-    .btn-close-modal{background:#ff007f;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px}
-    .settlement-control-box{background:#222;border:1px solid #444;padding:10px;border-radius:8px;margin-bottom:10px;display:flex;gap:8px}
-
-    .summary-card{background:linear-gradient(135deg,#3a1c5d,#1a0b33);border-radius:10px;padding:12px;margin-bottom:12px;border:1px solid #7b2cbf;display:flex;justify-content:space-around;text-align:center}
-    .summary-item .num{font-size:20px;font-weight:900;color:#00ff66}
-    .summary-item .label{font-size:12px;color:#bbb}
-    .teacher-section{margin-bottom:16px;background:#242424;border-radius:10px;border:1px solid #333;overflow:hidden}
-    .teacher-head{background:#4a0072;color:#fff;padding:8px 12px;font-weight:700;font-size:15px;display:flex;justify-content:space-between}
-    .report-table{width:100%;border-collapse:collapse;font-size:13px}
-    .report-table th{background:#333;color:#00d2ff;padding:8px 6px;text-align:left;font-weight:600;border-bottom:1px solid #444}
-    .report-table td{padding:8px 6px;border-bottom:1px solid #2a2a2a;vertical-align:top}
-    .badge-count{background:#00d2ff;color:#000;font-weight:700;padding:2px 6px;border-radius:10px;font-size:12px}
-    .student-tag{display:inline-block;background:#333;color:#e0e0e0;padding:2px 6px;border-radius:4px;margin:2px;font-size:12px;border:1px solid #444}
-    .btn-view-students{background:#00b0ff;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:700;font-size:16px;width:100%;margin-top:12px;cursor:pointer;display:none}
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>文舞集 SPECTRUM FLOW</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syncopate:wght@400;700&display=swap');
+:root{--lime:#d5ff00}
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#010204;color:#edffe1;font-family:'DM Mono',monospace}
+.stage{height:100vh;position:relative;background:radial-gradient(ellipse 55% 70% at 82% 52%,#0d1424 0%,#030407 55%,#010102 100%)}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+.stage::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(0deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:64px 64px;mask-image:radial-gradient(circle at 82% 55%,black,transparent 62%)}
+.copy{position:absolute;z-index:2;left:clamp(28px,5vw,80px);top:50%;transform:translateY(-50%);max-width:400px;pointer-events:none}
+h1{margin:0;font:700 clamp(36px,5vw,80px)/.85 'Syncopate',sans-serif;letter-spacing:-.09em;text-shadow:0 0 26px rgba(83,230,255,.25)}
+h1 i{font-style:normal;background:linear-gradient(90deg,#00ddff,#746bff,#ff26bb,#ffde22);-webkit-background-clip:text;background-clip:text;color:transparent}
+.controls-br{position:absolute;z-index:2;right:3vw;bottom:4vh;display:flex;gap:10px;flex-wrap:wrap}
+button{border:1px solid rgba(112,217,255,.65);padding:11px 15px;background:rgba(58,103,156,.15);color:#def9ff;font:11px 'DM Mono',monospace;cursor:pointer;transition:.25s}
+.primary{border-color:#f55ee9;background:linear-gradient(90deg,rgba(35,230,255,.16),rgba(255,40,177,.16))}
+button:hover{background:linear-gradient(90deg,#00dbff,#e930d5);color:#061017;box-shadow:0 0 28px rgba(52,214,255,.42)}
+.move-label{position:absolute;z-index:2;right:4vw;top:4vh;color:#b9faff;font-size:10px;letter-spacing:.15em}
+.move-label:before{content:'// ';color:#ff5edc}
+@media(max-width:900px){
+  .copy{top:15%;transform:none;left:26px}
+  h1{font-size:36px}
+  .controls-br{right:auto;left:26px;bottom:3vh}
+  .move-label{top:auto;bottom:10vh;right:4vw}
+}
+</style>
 </head>
 <body>
-
-<div id="idleWarningBox" class="idle-warning-box">
-  ⚠️ 檢測到閒置！系統即將於 <span id="idleCountdownSec" style="font-size:32px;text-decoration:underline;color:#fff;">5</span> 秒後自動退出管理者模式！<br>
-  <span style="font-size:14px;opacity:.9">(請點擊或觸碰畫面任意處繼續使用)</span>
-</div>
-
-<div id="reportModal" class="report-modal">
-  <div class="report-content-box">
-    <div class="report-header">
-      <h4 id="reportTitle">📊 統計報告</h4>
-      <button class="btn-close-modal" onclick="closeReportModal()">關閉</button>
-    </div>
-    <div id="reportText" class="report-body">載入中...</div>
+<main class="stage">
+  <canvas id="world" aria-label="會隨音樂跳舞的立體螢光火柴人"></canvas>
+  <section class="copy">
+    <h1><i>WWJ DANCE STUDIO</i></h1>
+  </section>
+  <div class="controls-br">
+    <button id="systemButton" class="primary">擷取電腦音訊</button>
   </div>
-</div>
-
-<div class="card-container">
-  <h2>&lt;文舞集&gt;簽到</h2>
-
-  <div class="course-list-box">
-    <div class="course-list-title">
-      <span>📅 當日上架課程 (現場人員操作)</span>
-      <span id="todayLabel" style="font-size:12px;color:#aaa">載入中...</span>
-    </div>
-    <div id="courseItemsContainer">
-      <div style="color:#aaa;text-align:center;padding:10px;">正在讀取當日課程...</div>
-    </div>
-  </div>
-
-  <div id="displayWindow" class="status-display theme-standby">請現場人員先開啟上方欲簽到課程之開關...</div>
-
-  <div id="confirmBox" class="confirm-box">
-    <div id="confirmMsg" style="font-size:20px;color:#ffeb3b;font-weight:700"></div>
-    <div class="confirm-btn-group">
-      <button id="btnConfirmYes" class="btn-confirm-yes">是 (再扣 1 點)</button>
-      <button id="btnConfirmNo" class="btn-confirm-no">否 (取消)</button>
-    </div>
-  </div>
-
-  <div id="adminPanel" class="admin-panel">
-    <h3>👑 管理者控制台 (已暫停扣款)</h3>
-    <p style="font-size:16px;color:#fff;margin-bottom:5px">當前讀取卡號：<b id="adminTargetCard" style="color:#00d2ff;font-size:20px">請輸入或刷卡...</b></p>
-    <p id="cardStatusBadge" style="font-size:14px;color:#ffeb3b;font-weight:700;margin-top:0"></p>
-
-    <button id="btnViewStudents" class="btn-view-students" onclick="fetchCourseStudents()">📋 查看此課程上課人員名單</button>
-
-    <div class="admin-section">
-      <div class="settlement-control-box">
-        <select id="selectSettlementMonth" style="flex:1;padding:8px;background:#333;color:#fff;border:none;border-radius:6px;font-size:16px;">
-          <option value="">自動搜尋月份中...</option>
-        </select>
-        <button class="btn-admin-act btn-info" style="margin-top:0;width:auto;padding:8px 15px;" onclick="triggerMonthlySettlement()">📊 月份結算</button>
-      </div>
-
-      <button class="btn-admin-act btn-info" style="margin-top:8px;" onclick="fetchRecentLogs()">📋 查詢 1 小時內簽到名單</button>
-      <div id="recentLogsContainer" style="display:none;margin-top:10px">
-        <div id="recentLogsList" class="log-list"></div>
-      </div>
-    </div>
-
-    <div class="admin-section">
-      <button class="btn-admin-act btn-warning" onclick="toggleReplaceMode()">🔄 進入卡片遺失換卡模式</button>
-      <div id="replaceSection" class="replace-box" style="display:none;background:#332200;border:2px solid #ff9800;padding:15px;border-radius:12px;margin-top:10px">
-        <h4 style="color:#ff9800;margin-top:0">💳 遺失換卡模式步驟：</h4>
-        <p style="font-size:14px;color:#ddd;margin:5px 0">1. 請將<b>【全新新卡】</b>靠卡/刷卡輸入<br>當前感應新卡號：<b id="newCardDisplay" style="color:#00d2ff">未讀取</b></p>
-        <div class="form-group" style="margin-top:10px">
-          <label>2. 請輸入要換卡的會員姓名：</label>
-          <div style="display:flex;gap:8px">
-            <input type="text" id="replaceSearchName" placeholder="輸入姓名...">
-            <button onclick="searchReplaceUser()" style="width:100px;background:#00b0ff;border:none;color:#fff;border-radius:8px;font-weight:700">查詢</button>
-          </div>
-        </div>
-        <div id="replaceUserPreview" style="display:none;background:#222;padding:10px;border-radius:8px;margin-top:10px;font-size:15px"></div>
-        <button id="btnConfirmReplace" class="btn-admin-act btn-danger" style="display:none;margin-top:10px" onclick="executeCardReplace()">3. 確定更換（廢除舊卡）</button>
-      </div>
-    </div>
-
-    <div id="sectionNewCard" class="admin-section" style="display:none">
-      <h4>✨ 建立新會員資料</h4>
-      <div class="form-group">
-        <label>使用者姓名：</label>
-        <input type="text" id="newUserName" placeholder="例如：王小明">
-      </div>
-      <div class="form-group">
-        <label>卡片類別：</label>
-        <select id="newCardType">
-          <option value="一般">一般會員</option>
-          <option value="VIP">VIP 會員</option>
-          <option value="體驗">體驗學員</option>
-          <option value="管理者">管理者</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>初始點數 (預設 10 點)：</label>
-        <input type="number" id="newCardPoints" value="10">
-      </div>
-      <div class="form-group">
-        <label>使用期限 (預設今日 +100 天)：</label>
-        <input type="date" id="newCardExpiry">
-      </div>
-      <button class="btn-admin-act" onclick="submitNewCard()">確認開卡 / 建立帳號</button>
-    </div>
-
-    <div id="sectionAddPoints" class="admin-section" style="display:none">
-      <h4>🎟️ 點數儲值與展延</h4>
-      <div class="form-group">
-        <label>展延到期日 (預設：當前到期日+剩餘天數+100天)：</label>
-        <input type="date" id="addPointExpiry">
-      </div>
-      <button class="btn-admin-act" style="background:#00c853;margin-bottom:8px" onclick="submitAddPoints(10)">+ 增加 10 點</button>
-      <button class="btn-admin-act" style="background:#00b0ff;margin-bottom:12px" onclick="submitAddPoints(12)">+ 增加 12 點</button>
-      <div class="switch-container">
-        <span style="font-size:14px;color:#ff8a80;font-weight:700">解鎖刪除卡片功能：</span>
-        <label class="switch">
-          <input type="checkbox" id="toggleDeleteUnlock" onchange="handleToggleDelete(this)">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <button id="btnDeleteCard" class="btn-admin-act btn-danger" style="display:none;margin-top:10px" onclick="submitDeleteCard()">🗑️ 確定刪除此卡片資料</button>
-    </div>
-
-    <button class="btn-admin-act btn-close-admin" onclick="closeAdminPanel()">退出管理者模式 (恢復打卡扣點)</button>
-  </div>
-</div>
+  <div class="move-label" id="moveLabel">ORBIT / 01</div>
+</main>
 
 <script>
-  const GAS_WEB_APP_URL="https://script.google.com/macros/s/AKfycbxh-0Xq4bF3sPYwwI-H6MjpN2ZjY3Jp1_ZfQN2TBrzNqGPj2P0MjudeHG2DYsQE4oytEg/exec";
-  const displayWindow=document.getElementById("displayWindow"),adminPanel=document.getElementById("adminPanel"),adminTargetCard=document.getElementById("adminTargetCard"),cardStatusBadge=document.getElementById("cardStatusBadge"),confirmBox=document.getElementById("confirmBox"),confirmMsg=document.getElementById("confirmMsg"),sectionNewCard=document.getElementById("sectionNewCard"),sectionAddPoints=document.getElementById("sectionAddPoints"),replaceSection=document.getElementById("replaceSection"),idleWarningBox=document.getElementById("idleWarningBox"),idleCountdownSec=document.getElementById("idleCountdownSec"),btnViewStudents=document.getElementById("btnViewStudents");
+// ==========================================
+// 1. 全域變數與 DOM 元素初始化
+// ==========================================
+const C=document.querySelector('#world'),
+      x=C.getContext('2d'),
+      L=document.querySelector('#moveLabel'),
+      B={sys:document.querySelector('#systemButton')};
+
+let w, h, d, an, data, ac, lev=.08, lastBeat=0, m=0, from=0, blendAt=0;
+
+// 舞步名稱列表（對應不同的動作庫）
+const names=[
+  'ORBIT','VOGUE','AIRWALK','PULSE','TIDAL','ROBOT','DRIFT','CYCLONE','KICK','SWAY',
+  'RIPPLE','DIVE','GLIDE','SPRINT','FLOAT','STOMP','SHUFFLE','POP','ROCK','BOW',
+  'FUNK','BURST','ECHO','NEXUS','FLUX','MATRIX','WAVE','ZENITH','QUASAR','PRISM',
+  'VALENCE','HALO','GLITCH','VORTEX','STRIDE','SURGE','TWIST','SPIN','IGNITE','BLADE',
+  'SHADOW','PULSAR','GRAVITY','NEON','POLAR','SYNTH','FUSION','KINETIC','LASER','ORBITAL',
+  'STRATOS','QUANTUM','ZEN','STELLAR','SOLAR','LUNAR','PLASMA','TITAN','ATLAS','CORE',
+  'MEGA_SWAY','SUPER_POP','HYPER_GROOVE','TURBO_STEP','BLAST_BEAT','GIGA_PULSE','ULTRA_WAVE','COSMIC_ROCK',
+  'NEON_SURGE','PLASMA_DANCE','SOLAR_STOMP','STELLAR_FLEX','ASTRO_GROOVE','VORTEX_FLOW','QUANTUM_SWAY','PULSAR_BEAT',
+  'TITAN_STEP','ZETA_PULSE','OMEGA_WAVE','SUPERNOVA_X','CYBER_DANCE','MATRIX_GROOVE','LASER_STEP','VOLT_SWAY',
+  'DYNAMIC_FX','KINETIC_X','PRISM_BEAT','QUASAR_STEP','ZENITH_FLOW','BLADE_DANCE','PHANTOM_X','SPECTRAL_SWAY',
+  'NEBULA_STEP','GALACTIC_FX','ORBIT_PLUS','VOGUE_MAX','AIRWALK_X','TIDAL_FLOW','CYCLONE_FX','RIPPLE_MAX',
+  'GLIDE_PLUS','SPRINT_X','FLOAT_MAX','SHUFFLE_X','ROCK_MAX','FUNK_PLUS','BURST_MAX','ECHO_X','NEXUS_MAX','FLUX_PLUS',
+  'APEX_DRIVE','MIRAGE_SWAY','VIPER_FLEX','ASTRA_JUMP','INFINITY_RUN','HYDRA_BOUNCE','OZONE_SHUFFLE','CELESTIAL_POP',
+  'TEMPEST_SWAY','LUMEN_BEAT','AETHER_GLIDE','SOLIS_TWIST','CHRONO_STEP','NOVA_SURGE','ECLIPSE_FLEX','COSMOS_FLOW',
+  'APOLLO_JUMP','NEBULA_DANCE','GIGA_SWAY','NEXUS_BOUNCE'
+],
+      P=(a,b,c=0)=>({x:a,y:b,z:c}),            // 建立 3D 座標點 {x, y, z} 的輔助函式
+      mix=(a,b,t)=>a+(b-a)*t,                 // 線性內插（Linear Interpolation）
+      ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2; // 平滑漸變緩和函數 (Ease In/Out)
+
+// RWD 畫布高解析度縮放處理
+function size(){
+  d=devicePixelRatio||1;
+  w=innerWidth;
+  h=innerHeight;
+  C.width=w*d;
+  C.height=h*d;
+  x.setTransform(d,0,0,d,0,0);
+}
+addEventListener('resize',size);
+size();
+
+// 音訊上下文初始化
+function ctx(){
+  if(!ac) ac=new AudioContext();
+  return ac;
+}
+
+// 綁定音訊分析器 (AnalyserNode)
+function hook(source){
+  an=ac.createAnalyser();
+  an.fftSize=512;
+  an.smoothingTimeConstant=.78;
+  source.connect(an);
+  data=new Uint8Array(an.frequencyBinCount);
+}
+
+// 點擊按鈕擷取系統/電腦音訊
+B.sys.onclick=async()=>{
+  try{
+    const st=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+    const at=st.getAudioTracks();
+    if(!at.length) throw 0;
+    hook(ctx().createMediaStreamSource(new MediaStream(at)));
+    B.sys.textContent='正在擷取電腦音訊';
+  }catch{
+    B.sys.textContent='未取得音訊';
+  }
+};
+
+// 隨機切換舞步（有音樂重低音擊中時才會觸發）
+function pick(t){
+  from=m;
+  m=Math.floor(Math.random()*names.length);
+  blendAt=t;
+  L.textContent=`${names[m]} / ${String(m+1).padStart(2,'0')}`;
+}
+
+// 計算骨骼頂點位置（從原點 o 沿著角度 angle 延伸長度 len，並加上 z 軸偏移）
+function bone(o,len,angle,z=0){
+  return P(o.x+Math.sin(angle)*len, o.y+Math.cos(angle)*len, o.z+z);
+}
+
+// ==========================================
+// 2. 核心：姿態與舞步計算 Engine (pose)
+// ==========================================
+function pose(t, id, scaleFactor = 1, headScaleBoost = 1){
+  let q=t/1000,
+      s=Math.sin(q*(3.6+(id%5)*.3)),  // 正弦週期波（控制律動擺動）
+      c=Math.cos(q*(3.6+(id%5)*.3)),  // 餘弦週期波
+      k=id%120,                       // 舞步索引編號
+      
+      // unit: 基礎骨架單位長度（根據螢幕高度按比例縮放）
+      unit = (h * (1/3) / 8.5) * scaleFactor,
+      // elastic: 隨音樂能量與時間伸縮的彈性係數
+      elastic = 1 + Math.sin(q * 14) * 0.15 * (lev + 0.4),
+      
+      // 頭部大小與半徑計算
+      headDiameter = unit * 1.3 * headScaleBoost,
+      headSize = headDiameter / 2, 
+
+      // 肢體各段骨骼長度定義
+      bodyLen  = unit * 1.8 * elastic,                   // 軀幹長度
+      upperArm = unit * 1.2 * (1 + Math.cos(q*12)*0.1), // 大臂長度
+      lowerArm = unit * 1.2 * (1 + Math.sin(q*12)*0.1), // 前臂長度
+      upperLeg = unit * 1.5 * (1 + Math.sin(q*10)*0.1), // 大腿長度
+      lowerLeg = unit * 1.5 * (1 + Math.cos(q*10)*0.1), // 小腿長度
+      
+      hy = -bodyLen, hx = 0, tilt = 0,
+      la = -0.72, lf = -0.34, ra = 0.72, rf = 0.34, lt = -0.18, lc = -0.08, rt = 0.18, rc = 0.08;
+
+  if(k===0){
+    // 0 號舞步：經典自然律動姿態 (ORBIT)
+    hx=2; tilt=0.00;  
+    la=-0.29; lf=-0.69; ra=0.34; rf=0.26;  
+    lt=-0.37; lc=-0.08; rt=0.31; rc=0.08;
+  }
+  else if(k===1){la=-2.35;lf=-2.72;ra=2.22;rf=2.62;tilt=.08*s}
+  else if(k===2){hx=17*s;tilt=.18*s;la=-1.5;lf=-1.05;ra=1.5;rf=1.05}
+  else if(k===3){hy=-bodyLen-19*Math.abs(s);la=-1.05;lf=-.55;ra=1.05;rf=.55;lt=-.52;lc=-.2;rt=.52;rc=.2}
+  else if(k===4){hx=32*s;la=-.9;lf=-.4;ra=.9;rf=.4;lt=-.2-s*.22;rt=-.2-s*.22}
+  else if(k===5){la=-1.9;lf=-1.25;ra=1.9;rf=1.25;lt=-.35*s;rt=.35*s}
+  else if(k===6){la=-2.35;lf=-2.7;ra=.55+.38*s;rf=.2+.3*s;tilt=.1*s}
+  else if(k===7){hx=29*s;tilt=.24*s;la=-1.15;lf=-.58;ra=1.15;rf=.58}
+  else if(k===8){ra=1.35;rf=1.65;rt=.85*Math.max(0,s)+.18;rc=.55*Math.max(0,s)+.08}
+  else if(k===9){tilt=.28*s;la=-.45;lf=-.12;ra=.45;rf=.12}
+  else if(k===10){la=-.75-.35*s;lf=-.25-.3*s;ra=.75-.35*s;rf=.25-.3*s;lt=-.18-.18*s;rt=-.18-.18*s}
+  else if(k===11){hx=12*c;la=-1.8;lf=-1.1;ra=0.5;rf=0.4;lt=-0.3;rt=0.4}
+  else if(k===12){hx=-15*s;tilt=-0.15;la=0.8;lf=1.2;ra=-1.2;rf=-0.8}
+  else if(k===13){hy=-bodyLen-10*s;la=-2.1;lf=-1.8;ra=2.1;rf=1.8;lt=-0.4;rt=0.4}
+  else if(k===14){hx=22*s;tilt=0.2*c;la=-1.2;lf=-0.8;ra=1.2;rf=0.8;lt=-0.25;rt=-0.25}
+  else if(k===15){hx=5*s;la=-0.5;lf=-0.2;ra=2.5;rf=2.1;lt=-0.1;rt=0.5}
+  else if(k===16){hx=-18*c;la=-1.4;lf=-1.4;ra=1.4;rf=1.4;lt=-0.45;rt=0.45}
+  else if(k===17){hx=15*s;tilt=0.3*s;la=-2.2;lf=-0.5;ra=0.2;rf=0.1;lt=-0.3;rt=0.2}
+  else if(k===18){hx=-10*s;la=-0.3;lf=-0.1;ra=-0.3;rf=-0.1;lt=-0.5;rt=-0.5}
+  else if(k===19){hx=35*s; tilt=-0.25; la=-2.5; lf=-1.8; ra=2.5; rf=1.8; lt=-0.4; rt=0.4;}
+  else if(k===20){hx=-30*s; tilt=0.25; la=-1.5; lf=-0.5; ra=-1.5; rf=-0.5; lt=-0.2; rt=0.2;}
+  else if(k===21){hx=-25; hy=-134; tilt=0.32;  la=-2.45; lf=-2.94; ra=1.21; rf=-0.15;  lt=0.13; lc=0.37; rt=1.14; rc=-0.16;}
+  else if(k===22){hx=28*s; hy=-bodyLen-15*c; tilt=0.2*s; la=-2.8; lf=-2.1; ra=1.4; rf=0.8; lt=-0.6*s; rt=0.6*s;}
+  else if(k===23){hx=-22*c; tilt=-0.3*s; la=0.5*s; lf=-1.2; ra=-2.5; rf=-1.8; lt=-0.4; lc=-0.8; rt=0.2;}
+  else if(k===24){hx=18*s; hy=-bodyLen-25*Math.abs(c); tilt=0.1; la=-1.8; lf=-0.9; ra=1.8; rf=0.9; lt=-0.8; lc=-0.4; rt=0.8; rc=0.4;}
+  else if(k===25){hx=-35*s; tilt=0.35*c; la=-3.0; lf=-2.8; ra=-1.2; rf=-0.5; lt=0.3*s; rt=-0.5*s;}
+  else if(k===26){hx=12*c; hy=-bodyLen+15*s; tilt=-0.2*s; la=-1.1; lf=-2.2; ra=2.2; rf=1.1; lt=-0.5; lc=0.2; rt=-0.1;}
+  else if(k===27){hx=-15*s; tilt=0.4*s; la=-2.2; lf=-0.3; ra=0.8; rf=2.1; lt=-0.7*c; rt=0.3*c;}
+  else if(k===28){hx=30*c; hy=-bodyLen-12*s; la=-0.4; lf=-0.2; ra=2.8; rf=2.5; lt=-0.2; rt=0.9*s;}
+  else if(k===29){hx=-28*s; tilt=-0.25*c; la=-2.7; lf=-1.5; ra=2.7; rf=1.5; lt=-0.6; lc=-0.3; rt=-0.2;}
+  else if(k===30){hx=20*s; hy=-bodyLen-18*Math.abs(s); la=-1.5*c; lf=-0.8; ra=1.5*c; rf=0.8; lt=-0.4; rt=0.4;}
+  else if(k===31){hx=20*c; tilt=0.2; la=-1.9; lf=-2.2; ra=1.9; rf=2.2; lt=-0.6; rt=0.6;}
+  else if(k===32){hx=-25*s; tilt=-0.15; la=-0.8; lf=-2.5; ra=0.8; rf=2.5; lt=-0.3; rt=0.5;}
+  else if(k===33){hx=30*s; tilt=0.3; la=-2.7; lf=-0.8; ra=2.7; rf=0.8; lt=-0.5; rt=-0.3;}
+  else if(k===34){hx=-15*c; tilt=-0.2; la=-1.2; lf=-1.2; ra=2.1; rf=1.9; lt=-0.4; rt=0.4;}
+  else if(k===35){hx=25*s; tilt=0.15; la=-2.1; lf=-1.9; ra=1.2; rf=1.2; lt=-0.3; rt=0.3;}
+  else if(k===36){hx=40*s; tilt=-0.3; la=-2.9; lf=-2.5; ra=2.9; rf=2.5; lt=-0.7; rt=0.7;}
+  else if(k===37){hx=-20*s; tilt=0.25*s; la=-1.4; lf=-2.8; ra=1.8; rf=0.6; lt=-0.5*c; rt=0.5*c;}
+  else if(k===38){hx=25*c; hy=-bodyLen-22*s; tilt=-0.15; la=-2.9; lf=-2.0; ra=-0.5; rf=-0.2; lt=-0.3; rt=0.7;}
+  else if(k===39){hx=-32*s; tilt=0.3; la=0.8; lf=1.5; ra=-2.8; rf=-2.2; lt=-0.8; lc=-0.2; rt=0.2;}
+  else if(k===40){hx=15*s; hy=-bodyLen+10*c; la=-2.3; lf=-1.2; ra=2.3; rf=1.2; lt=-0.2; rt=-0.6;}
+  else if(k===41){hx=-18*c; tilt=-0.35*s; la=-1.1; lf=-0.4; ra=2.7; rf=2.9; lt=-0.6*s; lc=-0.2; rt=0.4;}
+  else if(k===42){hx=35*s; hy=-bodyLen-14*s; tilt=0.2; la=-3.1; lf=-2.7; ra=3.1; rf=2.7; lt=-0.5; rt=0.5;}
+  else if(k===43){hx=-24*s; tilt=-0.2*c; la=-0.6; lf=-1.8; ra=1.6; rf=2.4; lt=-0.7; rt=0.1;}
+  else if(k===44){hx=10*c; hy=-bodyLen-30*Math.abs(s); la=-2.0; lf=-1.0; ra=2.0; rf=1.0; lt=-0.9; lc=-0.5; rt=0.9; rc=0.5;}
+  else if(k===45){hx=-30*c; tilt=0.4*s; la=-2.5; lf=-0.8; ra=-1.8; rf=-2.6; lt=0.2; rt=-0.8;}
+  else if(k===46){hx=22*s; tilt=-0.1; la=-1.7; lf=-2.5; ra=0.9; rf=1.7; lt=-0.4*s; rt=0.8*s;}
+  else if(k===47){hx=-16*s; hy=-bodyLen-12*c; la=-2.8; lf=-2.2; ra=2.8; rf=2.2; lt=-0.3; lc=-0.6; rt=0.3;}
+  else if(k===48){hx=27*c; tilt=0.28*s; la=0.2; lf=-0.8; ra=2.4; rf=1.5; lt=-0.8*s; rt=-0.2*s;}
+  else if(k===49){hx=-38*s; hy=-bodyLen+8*s; tilt=-0.3; la=-2.2; lf=-2.8; ra=2.2; rf=2.8; lt=-0.6; rt=0.6;}
+  else if(k===50){hx=14*s; tilt=0.15*c; la=-1.3; lf=-0.5; ra=2.8; rf=2.2; lt=-0.2; rt=0.7;}
+  else if(k===51){hx=-26*c; hy=-bodyLen-20*s; la=-2.9; lf=-1.4; ra=1.1; rf=0.3; lt=-0.7; lc=-0.3; rt=0.2;}
+  else if(k===52){hx=32*s; tilt=-0.2*s; la=-0.9; lf=-1.9; ra=-2.1; rf=-1.3; lt=-0.5; rt=-0.5;}
+  else if(k===53){hx=-12*s; hy=-bodyLen-16*Math.abs(c); la=-2.4; lf=-2.4; ra=2.4; rf=2.4; lt=-0.4*c; rt=0.4*c;}
+  else if(k===54){hx=29*c; tilt=0.35; la=-3.0; lf=-2.1; ra=0.7; rf=1.9; lt=-0.8; rt=0.3;}
+  else if(k===55){hx=-34*s; tilt=-0.18*s; la=-1.6; lf=-0.7; ra=2.6; rf=1.8; lt=-0.1; rt=-0.7;}
+  else if(k===56){hx=18*s; hy=-bodyLen-25*s; la=-2.1; lf=-2.8; ra=-2.1; rf=-2.8; lt=-0.6; lc=-0.2; rt=0.6;}
+  else if(k===57){hx=-22*c; tilt=0.22*c; la=-0.3; lf=-1.5; ra=2.3; rf=0.9; lt=-0.5*s; rt=0.5*s;}
+  else if(k===58){hx=36*s; hy=-bodyLen+12*s; la=-2.6; lf=-1.8; ra=1.9; rf=2.7; lt=-0.7; rt=0.4;}
+  else if(k===59){hx=-19*s; tilt=-0.28*s; la=-1.8; lf=-2.1; ra=-0.8; rf=-1.6; lt=-0.3; rt=0.8;}
+  else if(k===60){hx=24*c; hy=-bodyLen-15*c; la=-2.7; lf=-2.7; ra=2.7; rf=2.7; lt=-0.8*s; lc=-0.4; rt=0.2;}
+  else if(k===61){hx=-31*s; tilt=0.3*s; la=-1.2; lf=-0.2; ra=2.1; rf=1.4; lt=-0.2; rt=-0.6;}
+  else if(k===62){hx=16*s; hy=-bodyLen-22*Math.abs(s); la=-3.1; lf=-1.5; ra=1.5; rf=3.1; lt=-0.6; rt=0.6;}
+  else if(k===63){hx=-27*c; tilt=-0.2*c; la=-2.0; lf=-2.9; ra=-0.5; rf=-1.1; lt=-0.4; rt=-0.1;}
+  else if(k===64){hx=33*s; tilt=0.25; la=-0.8; lf=-1.6; ra=2.8; rf=2.0; lt=-0.7*s; rt=0.3*s;}
+  else if(k===65){hx=-15*s; hy=-bodyLen-18*s; la=-2.5; lf=-1.2; ra=2.5; rf=1.2; lt=-0.5; lc=-0.5; rt=0.5;}
+  else if(k===66){hx=21*c; tilt=-0.32*s; la=-1.7; lf=-0.5; ra=-2.3; rf=-2.8; lt=-0.2; rt=0.9;}
+  else if(k===67){hx=-36*s; hy=-bodyLen+10*c; la=-2.9; lf=-2.3; ra=1.1; rf=2.5; lt=-0.8; rt=-0.3;}
+  else if(k===68){hx=25*s; tilt=0.18*s; la=-0.5; lf=-2.1; ra=2.2; rf=1.0; lt=-0.3*s; rt=0.7*s;}
+  else if(k===69){hx=-23*c; hy=-bodyLen-28*Math.abs(c); la=-2.2; lf=-1.8; ra=2.2; rf=1.8; lt=-0.9; lc=-0.3; rt=0.9;}
+  else if(k===70){hx=38*s; tilt=-0.35*s; la=-2.8; lf=-2.8; ra=2.8; rf=2.8; lt=-0.5; rt=-0.8;}
+  else if(k===71){hx=-17*s; tilt=0.2*c; la=-1.5; lf=-2.4; ra=0.3; rf=1.2; lt=-0.6; rt=0.2;}
+  else if(k===72){hx=29*c; hy=-bodyLen-12*c; la=-2.4; lf=-0.9; ra=-1.9; rf=-2.5; lt=-0.2; lc=-0.7; rt=0.6;}
+  else if(k===73){hx=-33*s; tilt=-0.25*s; la=-1.0; lf=-0.3; ra=2.9; rf=2.1; lt=-0.7*s; rt=-0.2*s;}
+  else if(k===74){hx=13*s; hy=-bodyLen-20*s; la=-3.0; lf=-2.5; ra=1.6; rf=0.7; lt=-0.4; rt=0.8;}
+  else if(k===75){hx=-28*c; tilt=0.3*s; la=-2.1; lf=-1.7; ra=2.1; rf=1.7; lt=-0.8; rt=-0.4;}
+  else if(k===76){hx=34*s; hy=-bodyLen+15*Math.abs(s); la=-0.7; lf=-1.4; ra=-2.6; rf=-2.0; lt=-0.3; rt=0.5;}
+  else if(k===77){hx=-21*s; tilt=-0.15*c; la=-2.6; lf=-2.2; ra=2.6; rf=2.2; lt=-0.6*c; rt=0.6*c;}
+  else if(k===78){hx=26*c; hy=-bodyLen-24*s; la=-1.8; lf=-0.8; ra=2.0; rf=2.8; lt=-0.5; lc=-0.2; rt=0.3;}
+  else if(k===79){hx=-39*s; tilt=0.38*s; la=-3.1; lf=-2.9; ra=-0.9; rf=-0.4; lt=-0.9; rt=0.1;}
+  else if(k===80){hx=11*s; tilt=-0.2*s; la=-1.3; lf=-2.6; ra=2.5; rf=1.3; lt=-0.2; rt=-0.7;}
+  else if(k===81){hx=-30*c; hy=-bodyLen-16*c; la=-2.3; lf=-1.1; ra=1.3; rf=2.3; lt=-0.7; rt=-0.5;}
+  else if(k===82){hx=37*s; tilt=0.28*c; la=-2.8; lf=-2.0; ra=2.8; rf=2.0; lt=-0.4*s; rt=0.8*s;}
+  else if(k===83){hx=-14*s; hy=-bodyLen-26*Math.abs(s); la=-0.4; lf=-1.2; ra=2.7; rf=1.9; lt=-0.8; lc=-0.4; rt=0.8;}
+  else if(k===84){hx=23*c; tilt=-0.3*s; la=-2.2; lf=-2.8; ra=-1.4; rf=-2.1; lt=-0.3; rt=0.6;}
+  else if(k===85){hx=-35*s; hy=-bodyLen+12*s; la=-2.7; lf=-1.3; ra=1.8; rf=2.6; lt=-0.6; rt=-0.2;}
+  else if(k===86){hx=17*s; tilt=0.18*c; la=-1.9; lf=-0.6; ra=2.4; rf=1.6; lt=-0.5*s; rt=0.5*s;}
+  else if(k===87){hx=-25*c; hy=-bodyLen-19*s; la=-3.0; lf=-2.4; ra=3.0; rf=2.4; lt=-0.7; lc=-0.3; rt=0.4;}
+  else if(k===88){hx=31*s; tilt=-0.22*s; la=-1.1; lf=-2.3; ra=-2.0; rf=-1.5; lt=-0.2; rt=-0.9;}
+  else if(k===89){hx=-18*s; hy=-bodyLen-10*c; la=-2.0; lf=-1.9; ra=2.0; rf=1.9; lt=-0.8; rt=0.2;}
+  else if(k===90){hx=28*c; tilt=0.32*s; la=-2.6; lf=-2.1; ra=0.8; rf=1.8; lt=-0.4*c; rt=-0.4*c;}
+  else if(k===91){hx=-37*s; hy=-bodyLen-21*Math.abs(s); la=-0.8; lf=-0.5; ra=2.9; rf=2.7; lt=-0.9; rt=0.5;}
+  else if(k===92){hx=15*s; tilt=-0.17*s; la=-2.4; lf=-2.8; ra=2.4; rf=2.8; lt=-0.3; lc=-0.6; rt=0.7;}
+  else if(k===93){hx=-29*c; hy=-bodyLen+8*c; la=-1.6; lf=-0.9; ra=-2.2; rf=-2.9; lt=-0.5; rt=-0.3;}
+  else if(k===94){hx=36*s; tilt=0.26*c; la=-2.9; lf=-1.6; ra=1.2; rf=2.2; lt=-0.8*s; rt=0.2*s;}
+  else if(k===95){hx=-23*s; hy=-bodyLen-17*s; la=-2.1; lf=-2.5; ra=2.1; rf=2.5; lt=-0.6; rt=-0.6;}
+  else if(k===96){hx=19*c; tilt=-0.29*s; la=-0.5; lf=-1.7; ra=2.6; rf=1.1; lt=-0.2; lc=-0.5; rt=0.8;}
+  else if(k===97){hx=-32*s; hy=-bodyLen-23*c; la=-3.0; lf=-2.8; ra=3.0; rf=2.8; lt=-0.7; rt=0.3;}
+  else if(k===98){hx=22*s; tilt=0.2*s; la=-1.8; lf=-0.8; ra=1.8; rf=0.8; lt=-0.4; rt=0.4;}
+  else if(k===99){hx=-28*c; hy=-bodyLen-15*s; la=-2.3; lf=-2.0; ra=-1.2; rf=-0.5; lt=-0.6; rt=-0.2;}
+  else if(k===100){hx=30*s; tilt=-0.25; la=-0.9; lf=-1.8; ra=2.7; rf=2.3; lt=-0.3*s; rt=0.7*s;}
+  else if(k===101){hx=-16*s; hy=-bodyLen-25*Math.abs(c); la=-2.7; lf=-1.4; ra=1.4; rf=2.7; lt=-0.8; lc=-0.3; rt=0.8;}
+  else if(k===102){hx=25*c; tilt=0.3*s; la=-2.1; lf=-2.9; ra=-2.1; rf=-2.9; lt=-0.5; rt=0.5;}
+  else if(k===103){hx=-34*s; hy=-bodyLen+14*s; la=-1.5; lf=-0.4; ra=2.3; rf=1.7; lt=-0.7; rt=-0.4;}
+  else if(k===104){hx=18*s; tilt=-0.18*c; la=-2.8; lf=-2.2; ra=0.9; rf=1.9; lt=-0.4*s; rt=0.6*s;}
+  else if(k===105){hx=-27*c; hy=-bodyLen-18*s; la=-3.1; lf=-2.6; ra=3.1; rf=2.6; lt=-0.6; lc=-0.4; rt=0.3;}
+  else if(k===106){hx=33*s; tilt=0.22*s; la=-1.0; lf=-2.1; ra=-1.9; rf=-1.2; lt=-0.2; rt=-0.8;}
+  else if(k===107){hx=-20*s; hy=-bodyLen-12*c; la=-2.2; lf=-1.7; ra=2.2; rf=1.7; lt=-0.9; rt=0.1;}
+  else if(k===108){hx=26*c; tilt=-0.31*s; la=-2.5; lf=-2.3; ra=0.6; rf=1.6; lt=-0.3*c; rt=-0.3*c;}
+  else if(k===109){hx=-38*s; hy=-bodyLen-22*Math.abs(s); la=-0.7; lf=-0.6; ra=2.8; rf=2.5; lt=-0.8; rt=0.6;}
+  else if(k===110){hx=14*s; tilt=-0.16*s; la=-2.3; lf=-2.7; ra=2.3; rf=2.7; lt=-0.4; lc=-0.5; rt=0.6;}
+  else if(k===111){hx=-30*c; hy=-bodyLen+6*c; la=-1.7; lf=-0.8; ra=-2.1; rf=-2.8; lt=-0.6; rt=-0.2;}
+  else if(k===112){hx=35*s; tilt=0.27*c; la=-2.8; lf=-1.5; ra=1.3; rf=2.1; lt=-0.7*s; rt=0.3*s;}
+  else if(k===113){hx=-22*s; hy=-bodyLen-19*s; la=-2.0; lf=-2.4; ra=2.0; rf=2.4; lt=-0.5; rt=-0.7;}
+  else if(k===114){hx=20*c; tilt=-0.28*s; la=-0.6; lf=-1.6; ra=2.5; rf=1.2; lt=-0.3; lc=-0.4; rt=0.7;}
+  else if(k===115){hx=-31*s; hy=-bodyLen-24*c; la=-2.9; lf=-2.7; ra=2.9; rf=2.7; lt=-0.8; rt=0.2;}
+  else if(k===116){hx=24*s; tilt=0.21*s; la=-1.7; lf=-0.9; ra=1.7; rf=0.9; lt=-0.5; rt=0.5;}
+  else if(k===117){hx=-26*c; hy=-bodyLen-14*s; la=-2.4; lf=-1.9; ra=-1.3; rf=-0.6; lt=-0.7; rt=-0.1;}
+  else if(k===118){hx=29*s; tilt=-0.23; la=-0.8; lf=-1.7; ra=2.8; rf=2.2; lt=-0.4*s; rt=0.6*s;}
+  else{hx=25*c; tilt=-0.1*s; la=-1.6; lf=-1.9; ra=1.6; rf=1.9; lt=-0.2; rt=0.2;}
   
-  let isScanning=!1,isAdminMode=!1,isReplaceMode=!1,currentScannedCardForAdmin="",pendingCardId="",targetReplaceUser=null,autoResetTimer=null,adminIdleTimer=null,adminCountdownInterval=null,countdownSeconds=5,audioCtx=null;
-  let activeCourseInfo="",activeCourseName="";
+  let hip=P(hx,hy,0),
+      neck=bone(hip, bodyLen, Math.PI+tilt),
+      head=P(neck.x + Math.sin(Math.PI+tilt)*headSize, neck.y + Math.cos(Math.PI+tilt)*headSize, neck.z),
+      le=bone(neck, upperArm, la),
+      lh=bone(le, lowerArm, lf),
+      re=bone(neck, upperArm, ra),
+      rh=bone(re, lowerArm, rf),
+      lk=bone(hip, upperLeg, lt),
+      lfp=bone(lk, lowerLeg, lc),
+      rk=bone(hip, upperLeg, rt),
+      rfp=bone(rk, lowerLeg, rc);
+      
+  return {hip,chest:neck,neck,head,ls:neck,rs:neck,le,re,lh,rh,lk,rk,lf:lfp,rf:rfp, bodyLen, headSize, upperArm, lowerArm, upperLeg, lowerLeg};
+}
 
-  // 電腦模擬鍵盤輸入 (刷卡機 / 讀卡機 / 條碼槍) 相關變數
-  let keyboardBuffer = "";
-  let keyboardTimer = null;
+function fixedBone(o,a0,a1,b0,b1,u,len){
+  let dx=mix(a1.x-a0.x,b1.x-b0.x,u),
+      dy=mix(a1.y-a0.y,b1.y-b0.y,u),
+      dz=mix(a1.z-a0.z,b1.z-b0.z,u),
+      n=Math.hypot(dx,dy,dz)||1;
+  return P(o.x+dx/n*len,o.y+dy/n*len,o.z+dz/n*len);
+}
 
-  window.addEventListener("DOMContentLoaded", ()=>{
-    fetchTodayCourses();
-    initMonthDropdown();
-    initKeyboardScanListener();
+function blend(a,b,u){
+  let hip=P(mix(a.hip.x,b.hip.x,u),mix(a.hip.y,b.hip.y,u),mix(a.hip.z,b.hip.z,u)),
+      bodyLenM = mix(a.bodyLen, b.bodyLen, u),
+      headSzM  = mix(a.headSize, b.headSize, u),
+      upperArmM = mix(a.upperArm, b.upperArm, u),
+      lowerArmM = mix(a.lowerArm, b.lowerArm, u),
+      upperLegM = mix(a.upperLeg, b.upperLeg, u),
+      lowerLegM = mix(a.lowerLeg, b.lowerLeg, u),
+      
+      neck=fixedBone(hip,a.hip,a.neck,b.hip,b.neck,u,bodyLenM),
+      head=fixedBone(neck,a.neck,a.head,b.neck,b.head,u,headSzM),
+      
+      le=fixedBone(neck,a.neck,a.le,b.neck,b.le,u,upperArmM),
+      lh=fixedBone(le,a.le,a.lh,b.le,b.lh,u,lowerArmM),
+      re=fixedBone(neck,a.neck,a.re,b.neck,b.re,u,upperArmM),
+      rh=fixedBone(re,a.re,a.rh,b.re,b.rh,u,lowerArmM),
+      lk=fixedBone(hip,a.hip,a.lk,b.hip,b.lk,u,upperLegM),
+      lf=fixedBone(lk,a.lk,a.lf,b.lk,b.lf,u,lowerLegM),
+      rk=fixedBone(hip,a.hip,a.rk,b.hip,b.rk,u,upperLegM),
+      rf=fixedBone(rk,a.rk,a.rf,b.rk,b.rf,u,lowerLegM);
+      
+  return {hip,chest:neck,neck,head,ls:neck,rs:neck,le,re,lh,rh,lk,rk,lf,rf};
+}
+
+function pr(p,cx,cy,sc,mir){
+  let z=p.z+300,q=sc*330/z;
+  return {x:cx+(mir?-p.x:p.x)*q,y:cy+p.y*q,r:q};
+}
+
+function orb(p,R,h,a=1){
+  let g=x.createRadialGradient(p.x-R*.15,p.y-R*.18,0,p.x,p.y,R);
+  g.addColorStop(0,'rgba(255,255,255,.96)');
+  g.addColorStop(.19,`hsla(${h},100%,70%,${a})`);
+  g.addColorStop(1,`hsla(${h},100%,50%,0)`);
+  x.shadowBlur=30;
+  x.shadowColor=`hsl(${h},100%,60%)`;
+  x.fillStyle=g;
+  x.beginPath();
+  x.arc(p.x,p.y,R,0,7);
+  x.fill();
+  x.shadowBlur=0;
+}
+
+function line(a,b,h,t,al=1){
+  let dx=b.x-a.x,dy=b.y-a.y,z=Math.hypot(dx,dy),q=Math.atan2(dy,dx);
+  x.save();
+  x.translate(a.x,a.y);
+  x.rotate(q);
+  let g=x.createLinearGradient(0,0,z,0);
+  g.addColorStop(0,`hsla(${(h-65+t*38)%360},100%,65%,${al*.26})`);
+  g.addColorStop(.48,`hsla(${h},100%,73%,${al})`);
+  g.addColorStop(1,`hsla(${(h+75)%360},100%,66%,${al*.3})`);
+  x.lineCap='round';
+  x.shadowBlur=26+lev*32;
+  x.shadowColor=`hsl(${h},100%,60%)`;
+  x.strokeStyle=g;
+  x.lineWidth=12*b.r;
+  x.beginPath();
+  x.moveTo(0,0);
+  x.lineTo(z,0);
+  x.stroke();
+  x.shadowBlur=0;
+  x.strokeStyle='rgba(255,255,255,.68)';
+  x.lineWidth=1.45*b.r;
+  x.stroke();
+  x.restore();
+}
+
+function draw(p,t,cx,cy,sc,mir=false,al=1, colorOffset=0, isReflection=false){
+  let a={};
+  for(let k in p) {
+    if(isReflection){
+      let refP = { x: p[k].x, y: -p[k].y, z: p[k].z };
+      a[k] = pr(refP, cx, cy, sc, mir);
+    } else {
+      a[k] = pr(p[k], cx, cy, sc, mir);
+    }
+  }
+  
+  let hu=(t*.04+m*27 + colorOffset)%360,
+      ls=[['neck','hip'],['neck','le'],['le','lh'],['neck','re'],['re','rh'],['hip','lk'],['lk','lf'],['hip','rk'],['rk','rf']];
+  
+  let currentAlpha = isReflection ? al * 0.28 : al;
+
+  ls.forEach((v,i)=>line(a[v[0]],a[v[1]],hu+i*22,t*.003,currentAlpha));
+  let R=10*a.head.r;
+  
+  x.save();
+  x.shadowBlur = isReflection ? 12 : 22+lev*20;
+  x.shadowColor=`hsl(${hu+38},100%,60%)`;
+  x.strokeStyle=`hsla(${hu+38},100%,75%,${currentAlpha})`;
+  x.lineWidth=7*a.head.r;
+  x.beginPath();
+  x.arc(a.head.x,a.head.y,R,0,7);
+  x.stroke();
+  x.strokeStyle=`rgba(255,255,255,${isReflection ? 0.3 : 0.75})`;
+  x.lineWidth=1.2*a.head.r;
+  x.stroke();
+
+  let headRot = t * 0.004;
+  x.translate(a.head.x, a.head.y);
+  x.rotate(headRot);
+  x.strokeStyle = `hsla(${hu+180}, 100%, 85%, ${currentAlpha})`;
+  x.lineWidth = 2 * a.head.r;
+  x.beginPath();
+  x.arc(0, 0, R * 0.95, 0, Math.PI * 1.5);
+  x.stroke();
+  x.restore();
+
+  ls.forEach((v,i)=>{
+    for(let j=0;j<3;j++){
+      let u=(t*.001*(.32+i*.027)+j/3)%1;
+      orb({x:mix(a[v[0]].x,a[v[1]].x,u),y:mix(a[v[0]].y,a[v[1]].y,u)},(1.7+lev*1.5)*a[v[0]].r,hu+i*22,currentAlpha*.7);
+    }
   });
+}
 
-  // 全域鍵盤監聽，收集電腦模擬鍵盤輸入的卡號 (預設以 Enter 鍵為結束字元)
-  function initKeyboardScanListener() {
-    window.addEventListener("keydown", (e) => {
-      // 若使用者正在輸入框內打字（如：搜尋學員姓名、設定日期等），則不攔截
-      const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
-      if (tag === "input" || tag === "select" || tag === "textarea") {
-        return;
-      }
+// 繪製人物背後的方格造型牆面與輕微光影反光
+function drawGridWall(t, fy) {
+  x.save();
+  let step = 45;
+  let cols = Math.ceil(w / step);
+  let rows = Math.ceil(fy / step);
+  
+  x.strokeStyle = 'rgba(112, 217, 255, 0.08)';
+  x.lineWidth = 1;
+  
+  for(let i = 0; i <= cols; i++) {
+    x.beginPath();
+    x.moveTo(i * step, 0);
+    x.lineTo(i * step, fy);
+    x.stroke();
+  }
+  for(let j = 0; j <= rows; j++) {
+    x.beginPath();
+    x.moveTo(0, j * step);
+    x.lineTo(w, j * step);
+    x.stroke();
+  }
 
-      if (e.key === "Enter") {
-        if (keyboardBuffer.trim().length > 0) {
-          const scannedCode = keyboardBuffer.trim().toUpperCase();
-          keyboardBuffer = "";
-          handleCardInput(scannedCode);
-        }
-      } else if (e.key.length === 1) { // 僅收集單一文字/數字字元
-        keyboardBuffer += e.key;
-        if (keyboardTimer) clearTimeout(keyboardTimer);
-        // 若超過 500ms 未繼續輸入則清空緩衝區，避免人工慢速輸入誤觸
-        keyboardTimer = setTimeout(() => {
-          keyboardBuffer = "";
-        }, 500);
+  // 輕微火柴人光影的反光方格點綴
+  let hu = (t * .04 + m * 27) % 360;
+  for(let i = 0; i < cols; i++) {
+    for(let j = 0; j < rows; j++) {
+      let cellX = i * step + step / 2;
+      let cellY = j * step + step / 2;
+      let dist = Math.hypot(cellX - w * 0.82, cellY - fy * 0.5);
+      if(dist < 400 && (i + j) % 3 === 0) {
+        let alpha = Math.max(0, (1 - dist / 400) * (0.03 + lev * 0.08));
+        x.fillStyle = `hsla(${hu}, 100%, 75%, ${alpha})`;
+        x.fillRect(i * step + 1, j * step + 1, step - 2, step - 2);
       }
+    }
+  }
+  x.restore();
+}
+
+// 繪製動態舞台燈光光暈與影子 (3 盞隨機移動聚光燈)
+function drawStageSpotlightsAndShadows(t, fy, dancers) {
+  let spotlightCount = 3;
+  // 保持燈光基礎可見度，音樂能量越強時越亮
+  let intensity = 0.6 + Math.min(0.4, lev * 1.2);
+
+  for (let i = 0; i < spotlightCount; i++) {
+    let angle = (t * 0.0008 * (i + 1) + i * 2.1);
+    let lx = w * 0.5 + Math.sin(angle * 1.3) * (w * 0.35);
+    let ly = -50;
+    
+    let tx = w * 0.5 + Math.cos(angle * 0.9) * (w * 0.4);
+    let ty = fy + Math.sin(angle * 1.7) * 40;
+    
+    let hue = (t * 0.03 + i * 120) % 360;
+
+    x.save();
+    
+    // 1. 繪製牆面與地面的光束 (Cone Light) - 放大光束寬度與透明度
+    let beamGradient = x.createLinearGradient(lx, ly, tx, ty);
+    beamGradient.addColorStop(0, `hsla(${hue}, 100%, 85%, ${0.45 * intensity})`);
+    beamGradient.addColorStop(0.6, `hsla(${hue}, 100%, 65%, ${0.25 * intensity})`);
+    beamGradient.addColorStop(1, 'transparent');
+
+    x.fillStyle = beamGradient;
+    x.beginPath();
+    x.moveTo(lx - 35, ly);
+    x.lineTo(tx - 220, ty);
+    x.lineTo(tx + 220, ty);
+    x.lineTo(lx + 35, ly);
+    x.closePath();
+    x.fill();
+
+    // 2. 繪製地上照亮的光暈 - 放大地面光暈範圍
+    let floorLight = x.createRadialGradient(tx, ty, 10, tx, ty, 260);
+    floorLight.addColorStop(0, `hsla(${hue}, 100%, 85%, ${0.55 * intensity})`);
+    floorLight.addColorStop(0.5, `hsla(${hue}, 100%, 60%, ${0.25 * intensity})`);
+    floorLight.addColorStop(1, 'transparent');
+
+    x.fillStyle = floorLight;
+    x.beginPath();
+    x.ellipse(tx, ty, 260, 95, 0, 0, Math.PI * 2);
+    x.fill();
+
+    // 3. 計算並繪製舞者被燈光照射時投射在牆面/地面的陰影 - 放大影子範圍與清晰度
+    dancers.forEach(d => {
+      let headP = pr(d.pose.head, d.cx, d.cy, d.sc, false);
+      
+      let dx = headP.x - lx;
+      let shadowDx = dx * 0.8;
+      let shadowY = fy;
+      let shadowHeight = (fy - headP.y) * 1.1;
+
+      let shadowGlow = x.createRadialGradient(
+        headP.x + shadowDx, shadowY - shadowHeight * 0.4, 15,
+        headP.x + shadowDx, shadowY - shadowHeight * 0.4, 140
+      );
+      shadowGlow.addColorStop(0, `rgba(0, 2, 8, ${0.8 * intensity})`);
+      shadowGlow.addColorStop(0.6, `rgba(0, 2, 8, ${0.4 * intensity})`);
+      shadowGlow.addColorStop(1, 'transparent');
+
+      x.fillStyle = shadowGlow;
+      x.beginPath();
+      x.ellipse(headP.x + shadowDx, shadowY - shadowHeight * 0.2, 80, shadowHeight * 0.8, shadowDx * 0.003, 0, Math.PI * 2);
+      x.fill();
     });
+
+    x.restore();
   }
+}
 
-  // 處理讀取到的卡號
-  async function handleCardInput(cardId) {
-    if (isAdminMode) {
-      resetAdminIdleTimer();
-      currentScannedCardForAdmin = cardId;
-      adminTargetCard.innerText = cardId;
-      document.getElementById("toggleDeleteUnlock").checked = !1;
-      document.getElementById("btnDeleteCard").style.display = "none";
-
-      if (isReplaceMode) {
-        document.getElementById("newCardDisplay").innerText = cardId;
-        playSoundSuccess();
-        return;
-      }
-
-      setDisplay("🔍 正在查詢卡片狀態...", "theme-loading");
-      try {
-        const t = await safeFetch({ action: "checkCard", cardId: cardId });
-        if (!t) return;
-        if ("exists" === t.status) {
-          sectionNewCard.style.display = "none";
-          sectionAddPoints.style.display = "block";
-          const e = calcRechargeExpiry(t.expiryDate);
-          document.getElementById("addPointExpiry").value = e;
-          
-          let isLockedHint = t.isLocked ? " <span style='color:#ff4d4d;'>(⚠️ 已鎖卡)</span>" : "";
-          cardStatusBadge.innerHTML = `⚠️ 既有學員：${t.name}（剩餘 ${t.points} 點，原到期日 ${t.expiryDate || "無"}）${isLockedHint}`;
-          
-          let n = "";
-          n = t.logsAfterRecharge && t.logsAfterRecharge.length > 0 
-            ? t.logsAfterRecharge.map((item => `<div class="history-item">🕒 ${item.time}</div>`)).join("") 
-            : `<div class="history-item" style="color:#aaa;">儲值後尚無進場打卡紀錄</div>`;
-            
-          setDisplay(`
-            <div style="text-align: center;">
-              姓名：<b>${t.name}</b><br>
-              點數：<b>${t.points}</b> 點<br>
-              使用期限：${t.expiryDate || "無期限"}${t.isLocked ? " (已鎖卡)" : ""}
-            </div>
-            <div class="history-box" style="margin-top:15px; text-align:left; max-height:160px; overflow-y:auto;">
-              <div class="history-title" style="color:#00d2ff;">💰 最近一次儲值/開卡時間：</div>
-              <div class="history-item" style="margin-bottom:8px; font-weight:bold;">${t.lastRechargeTime}</div>
-              <div class="history-title" style="color:#ffeb3b;">📌 儲值(開卡)後打卡紀錄:</div>
-              ${n}
-            </div>
-          `, "theme-admin");
-          playSoundSuccess();
-        } else {
-          sectionNewCard.style.display = "block";
-          sectionAddPoints.style.display = "none";
-          document.getElementById("newCardPoints").value = 10;
-          document.getElementById("newCardExpiry").value = calcFutureDate(100);
-          cardStatusBadge.innerText = "✨ 此為全新的空白卡片，可建立新資料";
-          setDisplay(`👑 <b>全新卡片</b><br>卡號：<b>${cardId}</b><br>請於下方面板填寫資料開卡。`, "theme-admin");
-          playSoundSuccess();
-        }
-      } catch (err) {
-        setDisplay("❌ 查詢卡片狀態失敗：" + err.message, "theme-error");
-        playSoundError();
-      }
-      return;
+// ==========================================
+// 3. 主動畫與繪圖循環 (loop)
+// ==========================================
+function loop(t){
+  // 取得音訊頻率資料，無音樂時重置為 0 號舞步
+  if(an){
+    an.getByteFrequencyData(data);
+    let av=data.reduce((s,v)=>s+v,0)/data.length/255,
+        lo=data.slice(0,24).reduce((s,v)=>s+v,0)/24/255;
+    lev=mix(lev,av,.16);
+    if(lo>.38&&t-lastBeat>850){
+      lastBeat=t;
+      pick(t);
     }
-
-    if (!isScanning) {
-      setDisplay("⚠️ 請先開啟上方欲簽到課程之開關！", "theme-error");
-      playSoundError();
-      return;
-    }
-
-    processDeduct(cardId, !1);
-  }
-
-  async function initMonthDropdown(){
-    const select = document.getElementById("selectSettlementMonth");
-    const res = await safeFetch({action: "getAvailableLogMonths"});
-    
-    select.innerHTML = "";
-    if(res && res.status === "success" && res.months && res.months.length > 0){
-      res.months.forEach(mStr => {
-        const opt = document.createElement("option");
-        opt.value = mStr;
-        opt.innerText = `${mStr} 紀錄`;
-        select.appendChild(opt);
-      });
-    } else {
-      const now = new Date();
-      const mStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}`;
-      const opt = document.createElement("option");
-      opt.value = mStr;
-      opt.innerText = `${mStr} 紀錄`;
-      select.appendChild(opt);
+  }else{
+    lev=mix(lev,.08+Math.sin(t*.002)*.025,.06);
+    if(m !== 0) {
+      from = m;
+      m = 0;
+      blendAt = t; // 設定 Blend 時間戳記，確保在 1 秒內平滑回復到 0 號舞步
+      L.textContent = `${names[0]} / 01`;
     }
   }
-
-  function closeReportModal(){
-    document.getElementById("reportModal").style.display = "none";
-  }
-
-  function closeAdminPanel(){
-    isAdminMode = !1;
-    adminIdleTimer && clearTimeout(adminIdleTimer);
-    adminCountdownInterval && clearInterval(adminCountdownInterval);
-    idleWarningBox.style.display = "none";
-    adminPanel.style.display = "none";
-    currentScannedCardForAdmin = "";
-    if(isScanning){
-      setDisplay(`💻 請使用電腦刷卡機輸入卡號簽到【${activeCourseInfo}】...`, "theme-waiting");
-    } else {
-      setDisplay("請現場人員先開啟上方欲簽到課程之開關...", "theme-standby");
-    }
-  }
-
-  function initAudio(){audioCtx||(audioCtx=new(window.AudioContext||window.webkitAudioContext)),"suspended"===audioCtx.state&&audioCtx.resume()}
-  function playSoundSuccess(){if(initAudio(),audioCtx){const t=audioCtx.createOscillator(),e=audioCtx.createGain();t.type="sine",t.frequency.setValueAtTime(880,audioCtx.currentTime),e.gain.setValueAtTime(.3,audioCtx.currentTime),e.gain.exponentialRampToValueAtTime(.01,audioCtx.currentTime+.25),t.connect(e),e.connect(audioCtx.destination),t.start(),t.stop(audioCtx.currentTime+.25)}}
-  function playSoundError(){if(initAudio(),audioCtx){const t=audioCtx.currentTime,e=audioCtx.createOscillator(),n=audioCtx.createGain();e.type="sawtooth",e.frequency.setValueAtTime(220,t),n.gain.setValueAtTime(.3,t),n.gain.exponentialRampToValueAtTime(.01,t+.15),e.connect(n),n.connect(audioCtx.destination),e.start(t),e.stop(t+.15);const o=audioCtx.createOscillator(),a=audioCtx.createGain();o.type="sawtooth",o.frequency.setValueAtTime(180,t+.2),a.gain.setValueAtTime(.3,t+.2),a.gain.exponentialRampToValueAtTime(.01,t+.4),o.connect(a),a.connect(audioCtx.destination),o.start(t+.2),o.stop(t+.4)}}
-
-  function resetAdminIdleTimer(){
-    if(isAdminMode){
-      adminIdleTimer&&clearTimeout(adminIdleTimer);
-      adminCountdownInterval&&clearInterval(adminCountdownInterval);
-      idleWarningBox.style.display="none";
-      adminIdleTimer=setTimeout(()=>{startIdleCountdown()}, 20000);
-    }
-  }
-
-  function startIdleCountdown(){
-    countdownSeconds=5;
-    idleCountdownSec.innerText=countdownSeconds;
-    idleWarningBox.style.display="block";
-    adminCountdownInterval=setInterval(()=>{
-      countdownSeconds--;
-      idleCountdownSec.innerText=countdownSeconds;
-      if(countdownSeconds<=0){
-        clearInterval(adminCountdownInterval);
-        idleWarningBox.style.display="none";
-        closeAdminPanel();
-        alert("⏱️ 管理者模式已超過 25 秒未操作，系統已自動退出！");
-      }
-    },1000);
-  }
-
-  ["click","touchstart","touchmove","mousemove","keydown","scroll"].forEach(t=>{
-    window.addEventListener(t,()=>{
-      if(autoResetTimer){ clearTimeout(autoResetTimer); autoResetTimer=null; }
-      isAdminMode&&resetAdminIdleTimer();
-    },{passive:!0});
-  });
-
-  async function fetchTodayCourses(){
-    const res = await safeFetch({action: "getTodayCourses"});
-    const container = document.getElementById("courseItemsContainer");
-    const todayLabel = document.getElementById("todayLabel");
-    
-    if(res && res.status === "success"){
-      todayLabel.innerText = `${res.todayDay} 課程`;
-      if(!res.courses || res.courses.length === 0){
-        container.innerHTML = `<div style="color:#aaa;text-align:center;padding:10px;">今天（${res.todayDay}）暫無上架課程</div>`;
-        return;
-      }
-      container.innerHTML = res.courses.map((c, idx) => `
-        <div class="course-item">
-          <div class="course-info-text">
-            <div class="course-name">${c.courseName}</div>
-            <div class="course-sub">👤 老師：${c.teacher} | ⏰ ${c.timeInfo}</div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" name="courseToggle" class="course-toggle-btn" data-info="${c.courseName}-${c.teacher}" data-name="${c.courseName}" onchange="handleCourseToggle(this)">
-            <span class="slider"></span>
-          </label>
-        </div>
-      `).join("");
-    } else {
-      container.innerHTML = `<div style="color:#ff4d4d;text-align:center;padding:10px;">讀取當日課程失敗</div>`;
-    }
-  }
-
-  function handleCourseToggle(targetInput){
-    const toggles = document.querySelectorAll(".course-toggle-btn");
-    if(targetInput.checked){
-      toggles.forEach(input => { if(input !== targetInput) input.checked = false; });
-      activeCourseInfo = targetInput.getAttribute("data-info");
-      activeCourseName = targetInput.getAttribute("data-name");
-      
-      btnViewStudents.innerText = `📋 查看【${activeCourseName}】上課人員名單`;
-      btnViewStudents.style.display = "block";
-      
-      isScanning = !0;
-      setDisplay(`💻 請使用電腦刷卡機輸入卡號簽到【${activeCourseInfo}】...`, "theme-waiting");
-    } else {
-      activeCourseInfo = "";
-      activeCourseName = "";
-      btnViewStudents.style.display = "none";
-      isScanning = !0;
-      setDisplay("已關閉簽到感應。請現場人員開啟欲簽到課程之開關。", "theme-standby");
-    }
-  }
-
-  async function fetchCourseStudents(){
-    if(!activeCourseName) return alert("請先開啟課程開關！");
-    setDisplay("⏳ 正在讀取學員名單...","theme-loading");
-    const res = await safeFetch({action: "getCourseStudents", courseName: activeCourseName});
-    if(res && res.status === "success"){
-      showStudentListModal(activeCourseName, res.students);
-      setDisplay(`💻 請使用電腦刷卡機輸入卡號簽到【${activeCourseInfo}】...`, "theme-waiting");
-    } else {
-      alert(res ? res.message : "讀取學員名單失敗");
-    }
-  }
-
-  function showStudentListModal(courseName, students){
-    document.getElementById("reportTitle").innerHTML = `📋 【${courseName}】上課人員`;
-    const reportBody = document.getElementById("reportText");
-    
-    if (!students || students.length === 0) {
-      reportBody.innerHTML = `<div style="text-align:center;padding:30px;color:#aaa;">⚠️ 目前尚無預約或簽到學員</div>`;
-      document.getElementById("reportModal").style.display = "flex";
-      return;
-    }
-
-    let rowsHtml = students.map((s, idx) => {
-      const checkMark = s.isCheckedIn ? `<span class="check-icon-blink">✔︎</span>` : ``;
-      return `
-        <tr>
-          <td style="text-align:center;">${idx+1}</td>
-          <td>${checkMark}<b>${s.name}</b></td>
-          <td><a href="tel:${s.phone}" style="color:#00d2ff;">${s.phone || "無"}</a></td>
-          <td><span class="student-tag" style="${s.isWalkIn ? 'background:#d32f2f;color:#fff;' : (s.isTrial ? 'background:#ff9800;color:#fff;' : 'background:#00c853;color:#fff;')}">${s.type}</span></td>
-        </tr>
-      `;
-    }).join("");
-
-    reportBody.innerHTML = `
-      <div style="margin-bottom:10px;font-size:14px;color:#00d2ff;">👥 應到/已到總人數：<b>${students.length}</b> 人</div>
-      <table class="report-table">
-        <thead>
-          <tr>
-            <th style="width:12%;text-align:center;">#</th>
-            <th style="width:30%;">姓名</th>
-            <th style="width:38%;">電話</th>
-            <th style="width:20%;">屬性</th>
-          </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
-    `;
-    document.getElementById("reportModal").style.display = "flex";
-  }
-
-  async function triggerMonthlySettlement(){
-    const monthVal = document.getElementById("selectSettlementMonth").value;
-    if(!monthVal) return alert("請選擇要結算的月份！");
-    
-    setDisplay("⏳ 正在計算月份數據...","theme-loading");
-    const res = await safeFetch({action: "monthlySettlement", targetMonth: monthVal});
-    
-    if(res && res.status === "success"){
-      showSettlementReportModal(res.sheetName, res.statsData);
-      setDisplay("👑 <b>管理者控制台</b><br>月份結算已完成。","theme-admin");
-    } else {
-      alert(res ? res.message : "結算失敗");
-      setDisplay("👑 <b>管理者控制台</b>","theme-admin");
-    }
-  }
-
-  function showSettlementReportModal(sheetName, stats){
-    document.getElementById("reportTitle").innerHTML = `📊 ${sheetName}`;
-    const reportBody = document.getElementById("reportText");
-    
-    let totalClasses = 0, totalPeople = 0;
-    let htmlContent = "";
-
-    for(const teacher in stats){
-      let teacherHtml = "";
-      for(const course in stats[teacher]){
-        for(const dStr in stats[teacher][course]){
-          const students = stats[teacher][course][dStr];
-          totalClasses++;
-          totalPeople += students.length;
-          teacherHtml += `
-            <tr>
-              <td><b>${course}</b></td>
-              <td>${dStr}</td>
-              <td><span class="badge-count">${students.length} 人</span></td>
-              <td>${students.map(n => `<span class="student-tag">${n}</span>`).join("")}</td>
-            </tr>
-          `;
-        }
-      }
-
-      htmlContent += `
-        <div class="teacher-section">
-          <div class="teacher-head">
-            <span>👤 授課老師：${teacher}</span>
-          </div>
-          <table class="report-table">
-            <thead>
-              <tr>
-                <th style="width:25%;">課程</th>
-                <th style="width:18%;">日期</th>
-                <th style="width:17%;">人次</th>
-                <th style="width:40%;">簽到名單</th>
-              </tr>
-            </thead>
-            <tbody>${teacherHtml}</tbody>
-          </table>
-        </div>
-      `;
-    }
-
-    if(totalClasses === 0){
-      reportBody.innerHTML = `<div style="text-align:center;padding:30px;color:#aaa;">⚠️ 該月份無任何打卡扣點紀錄</div>`;
-    } else {
-      reportBody.innerHTML = `
-        <div class="summary-card">
-          <div class="summary-item">
-            <div class="num">${totalClasses}</div>
-            <div class="label">總開課堂數</div>
-          </div>
-          <div class="summary-item">
-            <div class="num">${totalPeople}</div>
-            <div class="label">總上課人次</div>
-          </div>
-        </div>
-        ${htmlContent}
-      `;
-    }
-
-    document.getElementById("reportModal").style.display = "flex";
-  }
-
-  function calcFutureDate(days){
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    return [d.getFullYear(), (""+(d.getMonth()+1)).padStart(2,"0"), (""+d.getDate()).padStart(2,"0")].join("-");
-  }
-
-  function calcRechargeExpiry(rawExpiryStr){
-    const now = new Date();
-    now.setHours(0,0,0,0);
-    let remDays = 0;
-    if(rawExpiryStr){
-      const exp = new Date(rawExpiryStr);
-      if(!isNaN(exp.getTime())){
-        remDays = Math.ceil((exp - now)/(1000*60*60*24));
-      }
-    }
-    if(remDays < 0) remDays = 0;
-    return calcFutureDate(remDays + 100);
-  }
-
-  function setDisplay(t,e){displayWindow.className=`status-display ${e}`,displayWindow.innerHTML=t}
   
-  function resetAutoResetTimer(timeoutMs = 3000){
-    autoResetTimer&&clearTimeout(autoResetTimer);
-    if(!isAdminMode){
-      autoResetTimer=setTimeout(()=>{
-        confirmBox.style.display="none";
-        pendingCardId="";
-        if(isScanning){
-          setDisplay(`💻 請使用電腦刷卡機輸入卡號簽到【${activeCourseInfo}】...`,"theme-waiting");
-        } else {
-          setDisplay("請現場人員先開啟上方欲簽到課程之開關...","theme-standby");
-        }
-      }, timeoutMs);
-    }
+  // 清空畫布
+  x.clearRect(0,0,w,h);
+  
+  let cx=w*.82, cy=h*.73, sc=Math.min(w,h)*.00205, fy=h*.81;
+
+  // 1. 繪製背景牆面霓虹光暈 (Radial Gradient)
+  let wallGlow = x.createRadialGradient(cx, cy - h*0.2, 10, cx, cy - h*0.2, w*0.55);
+  wallGlow.addColorStop(0, `hsla(${(t*.04+80)%360}, 100%, 65%, ${.12 + lev*.35})`);
+  wallGlow.addColorStop(0.5, `hsla(${(t*.04)%360}, 80%, 35%, ${.08 + lev*.2})`);
+  wallGlow.addColorStop(1, 'transparent');
+  x.fillStyle = wallGlow;
+  x.fillRect(0, 0, w, fy);
+
+  // 2. 繪製人物背後方格牆面 (Grid Wall)
+  drawGridWall(t, fy);
+
+  // 3. 繪製舞台地板區域漸變色 (Linear Gradient)
+  let floorGlow = x.createLinearGradient(0, fy, 0, h);
+  floorGlow.addColorStop(0, `hsla(${(t*.04)%360}, 100%, 70%, ${.22 + lev*.3})`);
+  floorGlow.addColorStop(0.15, `hsla(${(t*.04+40)%360}, 90%, 40%, ${.15 + lev*.2})`);
+  floorGlow.addColorStop(0.6, `rgba(5, 12, 28, 0.85)`);
+  floorGlow.addColorStop(1, `#010102`);
+  x.fillStyle = floorGlow;
+  x.fillRect(0, fy, w, h - fy);
+
+  // 4. 繪製地平交界霓虹亮線
+  x.save();
+  x.strokeStyle = `hsla(${(t*.04+120)%360}, 100%, 80%, ${.35 + lev*.4})`;
+  x.lineWidth = 2;
+  x.shadowBlur = 15;
+  x.shadowColor = `hsla(${(t*.04+120)%360}, 100%, 60%, 0.8)`;
+  x.beginPath();
+  x.moveTo(0, fy);
+  x.lineTo(w, fy);
+  x.stroke();
+  x.restore();
+  
+  // 5. 繪製透視地板橫向條紋 (3D 地板透視感)
+  x.save();
+  x.globalAlpha = .28 + lev * .25;
+  for(let i=0; i<22; i++){
+    let y = fy + i*i*1.35, s = 60 + i*38;
+    x.strokeStyle = `hsla(${(t*.05+i*12)%360}, 100%, 70%, ${0.5 - i*0.02})`;
+    x.lineWidth = i === 0 ? 2 : 1;
+    x.beginPath();
+    x.moveTo(cx-s, y);
+    x.lineTo(cx+s, y);
+    x.stroke();
   }
+  x.restore();
+  
+  let u=ease(Math.min(1,(t-blendAt)/1000));
+  let mainGroupCx = cx; 
 
-  async function safeFetch(t){
-    try{
-      const e=await fetch(GAS_WEB_APP_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify(t)});
-      if(!e.ok)return setDisplay(`⚠️ <b>伺服器回應異常 (${e.status})</b>`,"theme-error"),playSoundError(),null;
-      const n=e.headers.get("content-type");
-      return n&&n.includes("application/json")?await e.json():(setDisplay("⚠️ <b>Google 伺服器連線繁忙</b><br>請稍後 3 秒重新刷卡感應。","theme-error"),playSoundError(),null)
-    }catch(t){return setDisplay("❌ <b>連線失敗：</b><br>請檢查網路連線後重試。","theme-error"),playSoundError(),null}
-  }
+  let offLeft   = Math.sin(t * 0.0012) * 280 + Math.cos(t * 0.0023) * 120;
+  let offRight  = Math.cos(t * 0.0015) * 260 + Math.sin(t * 0.0019) * 140;
+  let offCenter = Math.sin(t * 0.0018) * 220 - Math.cos(t * 0.0011) * 100;
 
-  async function processDeduct(t,e=!1){
-    confirmBox.style.display="none",setDisplay(`💳 讀取卡號：<b>${t}</b><br>⏳ <b>資料處理中，請勿重複刷卡...</b>`,"theme-loading");
-    const n=await safeFetch({action:"deduct",cardId:t,courseInfo:activeCourseInfo,isForce:e});
-    if(n)if("success"===n.status){
-      playSoundSuccess();
-      
-      let logsHtml = "";
-      if(n.logsAfterRecharge && n.logsAfterRecharge.length > 0){
-        logsHtml = n.logsAfterRecharge.map(item => `<div class="history-item">${item.time}</div>`).join("");
-      } else {
-        logsHtml = `<div class="history-item" style="color:#aaa;">無紀錄</div>`;
-      }
+  let cxLeft = mainGroupCx - 170, cyLeft = cy + 30, tLeft = t + 300 + offLeft;
+  let pLeft = blend(pose(tLeft, from, 0.6, 1.5), pose(tLeft, m, 0.6, 1.5), u);
 
-      setDisplay(`
-        <div style="font-size:26px; color:#00ff66; text-align:center; margin-bottom:8px; font-weight:900;">打卡成功!</div>
-        <div style="font-size:20px; text-align:center; color:#00d2ff; margin-bottom:4px;">${n.courseNameOnly || activeCourseName}</div>
-        <div style="font-size:28px; text-align:center; margin-bottom:12px; color:#fff; font-weight:bold;">${n.name}</div>
-        <div style="font-size:16px; color:#fff; margin-bottom:4px;">點數 <span class="highlight-val">${n.remainingPoints}</span> 點</div>
-        <div style="font-size:16px; color:#fff; margin-bottom:8px;">使用期限<br><span style="font-size:20px; font-weight:bold; color:#00ff66;">${n.expiryDate}</span></div>
-        <div class="history-box">
-          <div class="history-title">儲值(開卡)後打卡紀錄:</div>
-          ${logsHtml}
-        </div>
-      `, "theme-success");
+  let cxRight = mainGroupCx + 130, cyRight = cy + 15, tRight = t + 600 + offRight;
+  let pRight = blend(pose(tRight, from, 0.7, 1.6), pose(tRight, m, 0.7, 1.6), u);
 
-      resetAutoResetTimer(3000);
+  let cxCenter = mainGroupCx - 30, cyCenter = cy, tCenter = t + offCenter;
+  let pMain = blend(pose(tCenter, from, 1, 1), pose(tCenter, m, 1, 1), u);
 
-    }else"need_confirm"===n.status?(playSoundError(),pendingCardId=t,confirmMsg.innerHTML=n.message,confirmBox.style.display="block",setDisplay("⚠️ <b>請於下方選擇是否繼續扣點</b>","theme-admin")):"admin"===n.status?(playSoundSuccess(),isAdminMode=!0,resetAdminIdleTimer(),autoResetTimer&&clearTimeout(autoResetTimer),currentScannedCardForAdmin="",adminTargetCard.innerText="請刷卡...",cardStatusBadge.innerText="",sectionNewCard.style.display="none",sectionAddPoints.style.display="none",setDisplay("👑 <b>管理者解鎖！</b><br>已進入管理者模式，<b>簽到扣款已暫停</b>。<br>請刷卡輸入欲處理的會員卡號。","theme-admin"),adminPanel.style.display="block",initMonthDropdown()):(playSoundError(),setDisplay(`❌ <b>打卡失敗：</b><br>${n.message}<br><br>💳 卡號：${t}`,"theme-error"));
-  }
+  const drawSpotlight = (xPos, yPos, radius, hue) => {
+    x.save();
+    let spotGlow = x.createRadialGradient(xPos, yPos, 2, xPos, yPos, radius);
+    spotGlow.addColorStop(0, `hsla(${hue}, 100%, 75%, ${0.45 + lev*0.3})`);
+    spotGlow.addColorStop(0.5, `hsla(${hue}, 100%, 50%, ${0.25 + lev*0.2})`);
+    spotGlow.addColorStop(1, 'transparent');
+    x.fillStyle = spotGlow;
+    x.beginPath();
+    x.ellipse(xPos, yPos, radius, radius * 0.35, 0, 0, Math.PI * 2);
+    x.fill();
+    x.restore();
+  };
 
-  document.getElementById("btnConfirmYes").addEventListener("click",(()=>{pendingCardId&&(processDeduct(pendingCardId,!0),pendingCardId="")})),document.getElementById("btnConfirmNo").addEventListener("click",(()=>{pendingCardId="",confirmBox.style.display="none",setDisplay("已取消重複扣點。請重新刷卡打卡。","theme-standby")}));
+  let hueL = (tLeft*.04 + m*27 + 120) % 360;
+  let hueR = (tRight*.04 + m*27) % 360;
+  let hueC = (tCenter*.04 + m*27 + 240) % 360;
 
-  function toggleReplaceMode(){(isReplaceMode=!isReplaceMode)?(replaceSection.style.display="block",sectionNewCard.style.display="none",sectionAddPoints.style.display="none",setDisplay("🔄 <b>已切換至卡片遺失換卡模式</b><br>請先刷卡讀取「全新卡片」，再輸入舊學員姓名搜尋。","theme-admin")):(replaceSection.style.display="none",targetReplaceUser=null,setDisplay("已離開換卡模式。","theme-admin"))}
+  // 顯著放大底座預設腳下 Spotlight 橢圓光圈範圍
+  drawSpotlight(cxLeft, fy + 10, 160, hueL);
+  drawSpotlight(cxRight, fy + 15, 180, hueR);
+  drawSpotlight(cxCenter, fy + 20, 220, hueC);
 
-  async function searchReplaceUser(){
-    const t=document.getElementById("replaceSearchName").value.trim();if(!t)return alert("請輸入會員姓名！");
-    const e=await safeFetch({action:"searchUserByName",name:t}),n=document.getElementById("replaceUserPreview"),o=document.getElementById("btnConfirmReplace");
-    e&&"found"===e.status?(playSoundSuccess(),targetReplaceUser=e.cardData,n.style.display="block",n.innerHTML=`
-        <b style="color:#00ff66;">✅ 找到學員資料：</b><br>
-        • 姓名：<b>${targetReplaceUser.name}</b><br>
-        • 剩餘點數：<b>${targetReplaceUser.points}</b> 點<br>
-        • 舊卡號：<span style="color:#ff4d4d; text-decoration:line-through;">${targetReplaceUser.oldCardId}</span>
-      `,o.style.display="block"):(playSoundError(),targetReplaceUser=null,n.style.display="block",n.innerHTML='<b style="color:#ff4d4d;">❌ 查無此會員名字！</b>',o.style.display="none")
-  }
+  // 繪製動態舞台聚光燈與對應人物陰影
+  drawStageSpotlightsAndShadows(t, fy, [
+    { pose: pLeft, cx: cxLeft, cy: cyLeft, sc: sc * 1.8 },
+    { pose: pRight, cx: cxRight, cy: cyRight, sc: sc * 2.1 },
+    { pose: pMain, cx: cxCenter, cy: cyCenter, sc: sc* 1.8 }
+  ]);
 
-  async function executeCardReplace(){
-    const t=document.getElementById("newCardDisplay").innerText;if("未讀取"===t||!t)return alert("請先刷卡讀取全新新卡片！");if(!targetReplaceUser)return alert("請先搜尋並確認會員資料！");
-    if(confirm(`⚠️ 確認更換？\n\n確定將【${targetReplaceUser.name}】的卡號由 ${targetReplaceUser.oldCardId} 更換為 ${t} 嗎？\n舊卡號將會廢除！`)){
-      setDisplay("⏳ 正在辦理換卡與廢除舊卡...","theme-loading");
-      const e=await safeFetch({action:"replaceCard",oldCardId:targetReplaceUser.oldCardId,newCardId:t,name:targetReplaceUser.name});
-      e&&"success"===e.status?(playSoundSuccess(),alert(e.message),toggleReplaceMode(),document.getElementById("newCardDisplay").innerText="未讀取",document.getElementById("replaceSearchName").value="",document.getElementById("replaceUserPreview").style.display="none",setDisplay(`🎉 <b>換卡成功！</b><br>會員：<b>${targetReplaceUser.name}</b><br>新卡號已被綁定，舊卡已註銷。`,"theme-admin")):(playSoundError(),alert(e?e.message:"換卡失敗"))
-    }
-  }
+  // 6. 繪製鏡面倒影區域
+  x.save();
+  x.beginPath();
+  x.rect(0, fy, w, h - fy);
+  x.clip();
 
-  async function submitNewCard(){
-    const t=document.getElementById("newUserName").value.trim(),e=document.getElementById("newCardType").value,n=document.getElementById("newCardPoints").value,o=document.getElementById("newCardExpiry").value;
-    if(!currentScannedCardForAdmin)return alert("請先刷卡讀取要開卡的卡片！");
-    if(!t)return alert("請輸入使用者姓名！");
-    setDisplay("⏳ 正在建立新卡片資料...","theme-loading");
-    const a=await safeFetch({action:"addCard",cardId:currentScannedCardForAdmin,name:t,cardType:e,points:n,expiryDate:o});
-    a&&(alert(a.message),"success"===a.status?(playSoundSuccess(),document.getElementById("newUserName").value="",adminTargetCard.innerText="請刷卡讀取下張卡片...",cardStatusBadge.innerText="",sectionNewCard.style.display="none",setDisplay("👑 <b>卡片建立成功！</b><br>可繼續刷卡讀取下一張卡片。","theme-admin")):playSoundError())
-  }
+  draw(pLeft, tLeft, cxLeft, cyLeft, sc, false, 0.8, 120, true);
+  draw(pRight, tRight, cxRight, cyRight, sc * 1.1, false, 1.0, 0, true);
+  draw(pMain, tCenter, cxCenter, cyCenter, sc, false, 0.9, 240, true);
+  x.restore();
 
-  async function submitAddPoints(t){
-    if(!currentScannedCardForAdmin)return alert("請先刷卡讀取要加點的會員卡片！");
-    const e=document.getElementById("addPointExpiry").value;
-    if(confirm(`確定要為卡號 ${currentScannedCardForAdmin} 增加 ${t} 點，並設定到期日為 ${e} 嗎？`)){
-      setDisplay("⏳ 點數儲值中...","theme-loading");
-      const n=await safeFetch({action:"addPoints",cardId:currentScannedCardForAdmin,addPointsAmount:t,expiryDate:e});
-      n&&(alert(n.message),"success"===n.status?(playSoundSuccess(),adminTargetCard.innerText="請刷卡讀取下張卡片...",cardStatusBadge.innerText="",sectionAddPoints.style.display="none",setDisplay("👑 <b>加點成功！</b><br>可繼續刷卡讀取下一張卡片。","theme-admin")):playSoundError())
-    }
-  }
+  // 7. 繪製實態火柴人主體
+  draw(pLeft, tLeft, cxLeft, cyLeft, sc, false, 0.8, 120);
+  draw(pRight, tRight, cxRight, cyRight, sc * 1.1, false, 1.0, 0);
+  draw(pMain, tCenter, cxCenter, cyCenter, sc, false, 0.9, 240);
+  
+  requestAnimationFrame(loop);
+}
 
-  function handleToggleDelete(t){document.getElementById("btnDeleteCard").style.display=t.checked?"block":"none"}
-
-  async function submitDeleteCard(){
-    if(!currentScannedCardForAdmin)return alert("請先刷卡讀取要刪除的卡片！");
-    if(confirm(`⚠️ 確定要刪除卡號 ${currentScannedCardForAdmin} 的所有資料嗎？此操作無法復原！`)){
-      setDisplay("⏳ 正在刪除卡片...","theme-loading");
-      const t=await safeFetch({action:"deleteCard",cardId:currentScannedCardForAdmin});
-      t&&(alert(t.message),"success"===t.status?(playSoundSuccess(),document.getElementById("toggleDeleteUnlock").checked=!1,document.getElementById("btnDeleteCard").style.display="none",adminTargetCard.innerText="請刷卡讀取下張卡片...",cardStatusBadge.innerText="",sectionAddPoints.style.display="none",setDisplay("👑 <b>卡片已成功刪除！</b><br>可繼續刷卡讀取其他卡片。","theme-admin")):playSoundError())
-    }
-  }
-
-  async function fetchRecentLogs(){
-    const t=document.getElementById("recentLogsContainer"),e=document.getElementById("recentLogsList");
-    e.innerHTML="載入中...",t.style.display="block";
-    const n=await safeFetch({action:"getRecentLogs"});
-    n&&"success"===n.status?(playSoundSuccess(),0===n.logs.length?e.innerHTML="<div style='color:#aaa; text-align:center;'>過去 1 小時內無學員簽到紀錄</div>":e.innerHTML=n.logs.map((t=>{
-      const e=t.note.includes("已取消");
-      return`
-        <div class="log-item">
-          <div>
-            <span>⏰ ${t.time} - <b>${t.name}</b></span>
-            <div style="font-size:12px; color:${e?"#ff4d4d":"#888"};">${t.note||"已簽到"}</div>
-          </div>
-          <div>
-            ${e?'<span style="color:#aaa; font-size:12px;">(已退點)</span>':`<button class="btn-refund" onclick="cancelCheckIn('${t.cardId}', '${t.name}', '${t.fullTime}')">↩️ 取消簽到退點</button>`}
-          </div>
-        </div>
-      `
-    })).join("")):playSoundError()
-  }
-
-  async function cancelCheckIn(t,e,lTime){
-    if(confirm(`確定要為【${e}】取消於 ${lTime} 的簽到並退回 1 點嗎？`)){
-      setDisplay("⏳ 取消簽到中...","theme-loading");
-      const n=await safeFetch({action:"cancelCheckIn",cardId:t,name:e,logTimeStr:lTime,courseInfo:activeCourseInfo});
-      n&&"success"===n.status?(playSoundSuccess(),alert(n.message),fetchRecentLogs(),setDisplay("👑 <b>已成功取消簽到退點！</b>","theme-admin")):(playSoundError(),alert(n?n.message:"取消簽到失敗"))
-    }
-  }
+// 啟動動畫
+L.textContent='ORBIT / 01';
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
