@@ -52,6 +52,14 @@ const C=document.querySelector('#world'),
 
 let w, h, d, an, data, ac, lev=.08, lastBeat=0, m=0, from=0, blendAt=0;
 
+// 左側火柴人位移與跑步狀態控制變數
+let shiftLeft = 0;       // 累積向左偏移量 (像素)
+let isRunningLeft = false; // 是否處於跑回原位狀態
+
+// 滿位後的狀態控制變數
+let leftState = 0;       // 0: 正常, 1: 暫停 1 秒, 2: 驚嘆號與全身紅光 1 秒, 3: 往回跑, 4: 使用零套舞步原地站 1 秒
+let leftStateStartTime = 0;
+
 // 舞步名稱列表（對應不同的動作庫）
 const names=[
   'ORBIT','VOGUE','AIRWALK','PULSE','TIDAL','ROBOT','DRIFT','CYCLONE','KICK','SWAY',
@@ -120,11 +128,56 @@ function pick(t){
   m=Math.floor(Math.random()*names.length);
   blendAt=t;
   L.textContent=`${names[m]} / ${String(m+1).padStart(2,'0')}`;
+
+  // 每次切換舞步時，最左邊的火柴人基準往左偏移 3 個像素
+  if(leftState === 0 && !isRunningLeft) {
+    shiftLeft += 5;
+    if(shiftLeft >= 500) {
+      leftState = 2; // 達到上限，進入步驟1：暫停動作 1 秒
+      leftStateStartTime = performance.now();
+    }
+  }
 }
 
 // 計算骨骼頂點位置（從原點 o 沿著角度 angle 延伸長度 len，並加上 z 軸偏移）
 function bone(o,len,angle,z=0){
   return P(o.x+Math.sin(angle)*len, o.y+Math.cos(angle)*len, o.z+z);
+}
+
+// 設計專屬的跑步動作姿態 (isRun = true 時調用)
+function runPose(t, scaleFactor = 1, headScaleBoost = 1) {
+  let q = t / 1000 * 12, // 跑步加快頻率
+      s = Math.sin(q),
+      c = Math.cos(q),
+      unit = (h * (1/3) / 8.5) * scaleFactor,
+      headDiameter = unit * 1.3 * headScaleBoost,
+      headSize = headDiameter / 2,
+      bodyLen  = unit * 1.8,
+      upperArm = unit * 1.2,
+      lowerArm = unit * 1.2,
+      upperLeg = unit * 1.5,
+      lowerLeg = unit * 1.5,
+      
+      // 跑步動作：身體向右傾斜，雙臂雙腿交替大甩動
+      hy = -bodyLen + Math.abs(s) * 8, hx = 5, tilt = 0.25,
+      la = -1.2 * s - 0.2, lf = -0.8 * Math.max(0, s),
+      ra = 1.2 * s + 0.2, rf = 0.8 * Math.max(0, -s),
+      lt = 1.0 * s, lc = -0.8 * Math.max(0, -s),
+      rt = -1.0 * s, rc = -0.8 * Math.max(0, s);
+
+  let hip=P(hx,hy,0),
+      neck=bone(hip, bodyLen, Math.PI+tilt),
+      head=P(neck.x + Math.sin(Math.PI+tilt)*headSize, neck.y + Math.cos(Math.PI+tilt)*headSize, neck.z),
+      le=bone(neck, upperArm, la),
+      lh=bone(le, lowerArm, lf),
+      re=bone(neck, upperArm, ra),
+      rh=bone(re, lowerArm, rf),
+      lk=bone(hip, upperLeg, lt),
+      lfp=bone(lk, lowerLeg, lc),
+      rk=bone(hip, upperLeg, rt),
+      rfp=bone(rk, lowerLeg, rc);
+      
+  return {hip,chest:neck,neck,head,ls:neck,rs:neck,le,re,lh,rh,lk,rk,lf:lfp,rf:rfp, bodyLen, headSize, upperArm, lowerArm, upperLeg, lowerLeg};
 }
 
 // ==========================================
@@ -333,13 +386,13 @@ function pr(p,cx,cy,sc,mir){
   return {x:cx+(mir?-p.x:p.x)*q,y:cy+p.y*q,r:q};
 }
 
-function orb(p,R,h,a=1){
+function orb(p,R,h,a=1,overrideColor=null){
   let g=x.createRadialGradient(p.x-R*.15,p.y-R*.18,0,p.x,p.y,R);
   g.addColorStop(0,'rgba(255,255,255,.96)');
-  g.addColorStop(.19,`hsla(${h},100%,70%,${a})`);
-  g.addColorStop(1,`hsla(${h},100%,50%,0)`);
+  g.addColorStop(.19, overrideColor ? overrideColor : `hsla(${h},100%,70%,${a})`);
+  g.addColorStop(1, overrideColor ? 'rgba(255,0,0,0)' : `hsla(${h},100%,50%,0)`);
   x.shadowBlur=30;
-  x.shadowColor=`hsl(${h},100%,60%)`;
+  x.shadowColor= overrideColor ? 'red' : `hsl(${h},100%,60%)`;
   x.fillStyle=g;
   x.beginPath();
   x.arc(p.x,p.y,R,0,7);
@@ -347,18 +400,24 @@ function orb(p,R,h,a=1){
   x.shadowBlur=0;
 }
 
-function line(a,b,h,t,al=1){
+function line(a,b,h,t,al=1,overrideColor=null){
   let dx=b.x-a.x,dy=b.y-a.y,z=Math.hypot(dx,dy),q=Math.atan2(dy,dx);
   x.save();
   x.translate(a.x,a.y);
   x.rotate(q);
   let g=x.createLinearGradient(0,0,z,0);
-  g.addColorStop(0,`hsla(${(h-65+t*38)%360},100%,65%,${al*.26})`);
-  g.addColorStop(.48,`hsla(${h},100%,73%,${al})`);
-  g.addColorStop(1,`hsla(${(h+75)%360},100%,66%,${al*.3})`);
+  if(overrideColor) {
+    g.addColorStop(0, `rgba(255,0,0,${al*.26})`);
+    g.addColorStop(.48, `rgba(255,100,100,${al})`);
+    g.addColorStop(1, `rgba(255,0,0,${al*.3})`);
+  } else {
+    g.addColorStop(0,`hsla(${(h-65+t*38)%360},100%,65%,${al*.26})`);
+    g.addColorStop(.48,`hsla(${h},100%,73%,${al})`);
+    g.addColorStop(1,`hsla(${(h+75)%360},100%,66%,${al*.3})`);
+  }
   x.lineCap='round';
   x.shadowBlur=26+lev*32;
-  x.shadowColor=`hsl(${h},100%,60%)`;
+  x.shadowColor= overrideColor ? 'red' : `hsl(${h},100%,60%)`;
   x.strokeStyle=g;
   x.lineWidth=12*b.r;
   x.beginPath();
@@ -372,7 +431,7 @@ function line(a,b,h,t,al=1){
   x.restore();
 }
 
-function draw(p,t,cx,cy,sc,mir=false,al=1, colorOffset=0, isReflection=false){
+function draw(p,t,cx,cy,sc,mir=false,al=1, colorOffset=0, isReflection=false, overrideColor=null){
   let a={};
   for(let k in p) {
     if(isReflection){
@@ -388,13 +447,13 @@ function draw(p,t,cx,cy,sc,mir=false,al=1, colorOffset=0, isReflection=false){
   
   let currentAlpha = isReflection ? al * 0.28 : al;
 
-  ls.forEach((v,i)=>line(a[v[0]],a[v[1]],hu+i*22,t*.003,currentAlpha));
+  ls.forEach((v,i)=>line(a[v[0]],a[v[1]],hu+i*22,t*.003,currentAlpha, overrideColor));
   let R=10*a.head.r;
   
   x.save();
   x.shadowBlur = isReflection ? 12 : 22+lev*20;
-  x.shadowColor=`hsl(${hu+38},100%,60%)`;
-  x.strokeStyle=`hsla(${hu+38},100%,75%,${currentAlpha})`;
+  x.shadowColor= overrideColor ? 'red' : `hsl(${hu+38},100%,60%)`;
+  x.strokeStyle= overrideColor ? `rgba(255,50,50,${currentAlpha})` : `hsla(${hu+38},100%,75%,${currentAlpha})`;
   x.lineWidth=7*a.head.r;
   x.beginPath();
   x.arc(a.head.x,a.head.y,R,0,7);
@@ -406,7 +465,7 @@ function draw(p,t,cx,cy,sc,mir=false,al=1, colorOffset=0, isReflection=false){
   let headRot = t * 0.004;
   x.translate(a.head.x, a.head.y);
   x.rotate(headRot);
-  x.strokeStyle = `hsla(${hu+180}, 100%, 85%, ${currentAlpha})`;
+  x.strokeStyle = overrideColor ? `rgba(255,200,200,${currentAlpha})` : `hsla(${hu+180}, 100%, 85%, ${currentAlpha})`;
   x.lineWidth = 2 * a.head.r;
   x.beginPath();
   x.arc(0, 0, R * 0.95, 0, Math.PI * 1.5);
@@ -416,9 +475,22 @@ function draw(p,t,cx,cy,sc,mir=false,al=1, colorOffset=0, isReflection=false){
   ls.forEach((v,i)=>{
     for(let j=0;j<3;j++){
       let u=(t*.001*(.32+i*.027)+j/3)%1;
-      orb({x:mix(a[v[0]].x,a[v[1]].x,u),y:mix(a[v[0]].y,a[v[1]].y,u)},(1.7+lev*1.5)*a[v[0]].r,hu+i*22,currentAlpha*.7);
+      orb({x:mix(a[v[0]].x,a[v[1]].x,u),y:mix(a[v[0]].y,a[v[1]].y,u)},(1.7+lev*1.5)*a[v[0]].r,hu+i*22,currentAlpha*.7, overrideColor);
     }
   });
+}
+
+// 繪製驚嘆號與紅色閃光
+function drawExclamation(headP, now) {
+  x.save();
+  let flash = Math.floor(now / 100) % 2 === 0;
+  x.shadowBlur = 30;
+  x.shadowColor = '#ff0000';
+  x.fillStyle = flash ? '#ffffff' : '#ff0000';
+  x.font = 'bold 100px sans-serif';
+  x.textAlign = 'center';
+  x.fillText('‼️', headP.x, headP.y - 60);
+  x.restore();
 }
 
 // 繪製人物背後的方格造型牆面與輕微光影反光
@@ -461,25 +533,29 @@ function drawGridWall(t, fy) {
   x.restore();
 }
 
-// 繪製動態舞台燈光光暈與影子 (3 盞隨機移動聚光燈)
-function drawStageSpotlightsAndShadows(t, fy, dancers) {
+// 繪製動態舞台燈光光暈與影子 (3 盞聚光燈，限制集中在三個人附近晃動，無聲音時隱藏)
+function drawStageSpotlightsAndShadows(t, fy, dancers, hasAudio) {
+  if (!hasAudio) return; // 沒有聲音時 spotlight 完全不出現
+
   let spotlightCount = 3;
-  // 保持燈光基礎可見度，音樂能量越強時越亮
   let intensity = 0.6 + Math.min(0.4, lev * 1.2);
 
   for (let i = 0; i < spotlightCount; i++) {
-    let angle = (t * 0.0008 * (i + 1) + i * 2.1);
-    let lx = w * 0.5 + Math.sin(angle * 1.3) * (w * 0.35);
+    let targetDancer = dancers[i % dancers.length];
+    let angle = (t * 0.0015 * (i + 1) + i * 2.1);
+    
+    // 將 Spotlight 的移動範圍集中照射在目標舞者周圍晃動
+    let lx = targetDancer.cx + Math.sin(angle) * 80;
     let ly = -50;
     
-    let tx = w * 0.5 + Math.cos(angle * 0.9) * (w * 0.4);
-    let ty = fy + Math.sin(angle * 1.7) * 40;
+    let tx = targetDancer.cx + Math.cos(angle * 1.2) * 60;
+    let ty = fy + Math.sin(angle * 1.5) * 20;
     
     let hue = (t * 0.03 + i * 120) % 360;
 
     x.save();
     
-    // 1. 繪製牆面與地面的光束 (Cone Light) - 放大光束寬度與透明度
+    // 1. 繪製牆面與地面的光束 (Cone Light)
     let beamGradient = x.createLinearGradient(lx, ly, tx, ty);
     beamGradient.addColorStop(0, `hsla(${hue}, 100%, 85%, ${0.45 * intensity})`);
     beamGradient.addColorStop(0.6, `hsla(${hue}, 100%, 65%, ${0.25 * intensity})`);
@@ -487,25 +563,25 @@ function drawStageSpotlightsAndShadows(t, fy, dancers) {
 
     x.fillStyle = beamGradient;
     x.beginPath();
-    x.moveTo(lx - 35, ly);
-    x.lineTo(tx - 220, ty);
-    x.lineTo(tx + 220, ty);
-    x.lineTo(lx + 35, ly);
+    x.moveTo(lx - 25, ly);
+    x.lineTo(tx - 120, ty);
+    x.lineTo(tx + 120, ty);
+    x.lineTo(lx + 25, ly);
     x.closePath();
     x.fill();
 
-    // 2. 繪製地上照亮的光暈 - 放大地面光暈範圍
-    let floorLight = x.createRadialGradient(tx, ty, 10, tx, ty, 260);
+    // 2. 繪製地上照亮的光暈
+    let floorLight = x.createRadialGradient(tx, ty, 10, tx, ty, 160);
     floorLight.addColorStop(0, `hsla(${hue}, 100%, 85%, ${0.55 * intensity})`);
     floorLight.addColorStop(0.5, `hsla(${hue}, 100%, 60%, ${0.25 * intensity})`);
     floorLight.addColorStop(1, 'transparent');
 
     x.fillStyle = floorLight;
     x.beginPath();
-    x.ellipse(tx, ty, 260, 95, 0, 0, Math.PI * 2);
+    x.ellipse(tx, ty, 160, 60, 0, 0, Math.PI * 2);
     x.fill();
 
-    // 3. 計算並繪製舞者被燈光照射時投射在牆面/地面的陰影 - 放大影子範圍與清晰度
+    // 3. 計算並繪製舞者被燈光照射時投射在牆面/地面的陰影
     dancers.forEach(d => {
       let headP = pr(d.pose.head, d.cx, d.cy, d.sc, false);
       
@@ -536,22 +612,32 @@ function drawStageSpotlightsAndShadows(t, fy, dancers) {
 // 3. 主動畫與繪圖循環 (loop)
 // ==========================================
 function loop(t){
-  // 取得音訊頻率資料，無音樂時重置為 0 號舞步
+  let hasAudio = false;
+
+  // 取得音訊頻率資料，檢測是否有聲音發出
   if(an){
     an.getByteFrequencyData(data);
     let av=data.reduce((s,v)=>s+v,0)/data.length/255,
         lo=data.slice(0,24).reduce((s,v)=>s+v,0)/24/255;
     lev=mix(lev,av,.16);
+
+    if(av > 0.02) {
+      hasAudio = true; // 偵測到有效聲音訊號
+    }
+
     if(lo>.38&&t-lastBeat>850){
       lastBeat=t;
       pick(t);
     }
-  }else{
+  }
+
+  // 沒有輸入任何音源，或者偵測到沒有任何聲音時：人物動作回復到舞步 0
+  if(!hasAudio){
     lev=mix(lev,.08+Math.sin(t*.002)*.025,.06);
     if(m !== 0) {
       from = m;
       m = 0;
-      blendAt = t; // 設定 Blend 時間戳記，確保在 1 秒內平滑回復到 0 號舞步
+      blendAt = t; // 設定 Blend 時間戳記，平滑回復到 0 號舞步 (舞步0)
       L.textContent = `${names[0]} / 01`;
     }
   }
@@ -614,8 +700,48 @@ function loop(t){
   let offRight  = Math.cos(t * 0.0015) * 260 + Math.sin(t * 0.0019) * 140;
   let offCenter = Math.sin(t * 0.0018) * 220 - Math.cos(t * 0.0011) * 100;
 
-  let cxLeft = mainGroupCx - 170, cyLeft = cy + 30, tLeft = t + 300 + offLeft;
-  let pLeft = blend(pose(tLeft, from, 0.6, 1.5), pose(tLeft, m, 0.6, 1.5), u);
+  // 處理最左邊火柴人的狀態機邏輯
+  let now = performance.now();
+  if (leftState === 1) { // 1. 暫停動作 1 秒
+    if (now - leftStateStartTime >= 1000) {
+      leftState = 2;
+      leftStateStartTime = now;
+    }
+  } else if (leftState === 2) { // 2. 閃爍驚嘆號與全身紅色光芒 1 秒
+    if (now - leftStateStartTime >= 1000) {
+      leftState = 3;
+      isRunningLeft = true;
+    }
+  } else if (leftState === 3) { // 3. 往回跑回基準點
+    shiftLeft -= 4;
+    if (shiftLeft <= 0) {
+      shiftLeft = 0;
+      isRunningLeft = false;
+      leftState = 4; // 跑回基準點後進入步驟 4
+      leftStateStartTime = now;
+    }
+  } else if (leftState === 4) { // 4. 使用零套舞步，站在原地 1 秒
+    if (now - leftStateStartTime >= 1000) {
+      leftState = 0; // 完成後恢復正常跟上舞步
+    }
+  }
+
+  let cxLeft = mainGroupCx - 170 - shiftLeft, cyLeft = cy + 30, tLeft = t + 300 + offLeft;
+  
+  // 計算左側火柴人的姿態
+  let pLeft;
+  let overrideColorLeft = null;
+
+  if (leftState === 1 || leftState === 2) {
+    pLeft = blend(pose(leftStateStartTime + 300 + offLeft, from, 0.6, 1.5), pose(leftStateStartTime + 300 + offLeft, m, 0.6, 1.5), u);
+    if (leftState === 2) overrideColorLeft = 'rgba(255,0,0,1)';
+  } else if (leftState === 3) {
+    pLeft = runPose(tLeft, 0.6, 1.5);
+  } else if (leftState === 4) {
+    pLeft = pose(tLeft, 0, 0.6, 1.5); // 零套舞步
+  } else {
+    pLeft = blend(pose(tLeft, from, 0.6, 1.5), pose(tLeft, m, 0.6, 1.5), u);
+  }
 
   let cxRight = mainGroupCx + 130, cyRight = cy + 15, tRight = t + 600 + offRight;
   let pRight = blend(pose(tRight, from, 0.7, 1.6), pose(tRight, m, 0.7, 1.6), u);
@@ -624,6 +750,7 @@ function loop(t){
   let pMain = blend(pose(tCenter, from, 1, 1), pose(tCenter, m, 1, 1), u);
 
   const drawSpotlight = (xPos, yPos, radius, hue) => {
+    if(!hasAudio) return; // 無聲音時隱藏
     x.save();
     let spotGlow = x.createRadialGradient(xPos, yPos, 2, xPos, yPos, radius);
     spotGlow.addColorStop(0, `hsla(${hue}, 100%, 75%, ${0.45 + lev*0.3})`);
@@ -645,12 +772,12 @@ function loop(t){
   drawSpotlight(cxRight, fy + 15, 180, hueR);
   drawSpotlight(cxCenter, fy + 20, 220, hueC);
 
-  // 繪製動態舞台聚光燈與對應人物陰影
+  // 繪製動態舞台聚光燈與對應人物陰影 (只在有聲音時顯示)
   drawStageSpotlightsAndShadows(t, fy, [
     { pose: pLeft, cx: cxLeft, cy: cyLeft, sc: sc * 1.8 },
     { pose: pRight, cx: cxRight, cy: cyRight, sc: sc * 2.1 },
     { pose: pMain, cx: cxCenter, cy: cyCenter, sc: sc* 1.8 }
-  ]);
+  ], hasAudio);
 
   // 6. 繪製鏡面倒影區域
   x.save();
@@ -658,15 +785,21 @@ function loop(t){
   x.rect(0, fy, w, h - fy);
   x.clip();
 
-  draw(pLeft, tLeft, cxLeft, cyLeft, sc, false, 0.8, 120, true);
+  draw(pLeft, tLeft, cxLeft, cyLeft, sc, false, 0.8, 120, true, overrideColorLeft);
   draw(pRight, tRight, cxRight, cyRight, sc * 1.1, false, 1.0, 0, true);
   draw(pMain, tCenter, cxCenter, cyCenter, sc, false, 0.9, 240, true);
   x.restore();
 
   // 7. 繪製實態火柴人主體
-  draw(pLeft, tLeft, cxLeft, cyLeft, sc, false, 0.8, 120);
+  draw(pLeft, tLeft, cxLeft, cyLeft, sc, false, 0.8, 120, false, overrideColorLeft);
   draw(pRight, tRight, cxRight, cyRight, sc * 1.1, false, 1.0, 0);
   draw(pMain, tCenter, cxCenter, cyCenter, sc, false, 0.9, 240);
+
+  // 若為步驟 2，繪製驚嘆號
+  if (leftState === 2) {
+    let headP = pr(pLeft.head, cxLeft, cyLeft, sc, false);
+    drawExclamation(headP, now);
+  }
   
   requestAnimationFrame(loop);
 }
