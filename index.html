@@ -222,6 +222,11 @@
 
 <script>
   const GAS_WEB_APP_URL="https://script.google.com/macros/s/AKfycbxh-0Xq4bF3sPYwwI-H6MjpN2ZjY3Jp1_ZfQN2TBrzNqGPj2P0MjudeHG2DYsQE4oytEg/exec";
+  // 讀卡機回傳卡號兜底：純數字卡號一律補回 10 碼 (前導 0)，杜絕 0840269854 被讀成 840269854 查無卡號
+  function normalizeCardId(code){
+    const s=String(code||"").trim().toUpperCase();
+    return /^\d{1,9}$/.test(s)?s.padStart(10,"0"):s;
+  }
   const displayWindow=document.getElementById("displayWindow"),adminPanel=document.getElementById("adminPanel"),adminTargetCard=document.getElementById("adminTargetCard"),cardStatusBadge=document.getElementById("cardStatusBadge"),confirmBox=document.getElementById("confirmBox"),confirmMsg=document.getElementById("confirmMsg"),sectionNewCard=document.getElementById("sectionNewCard"),sectionAddPoints=document.getElementById("sectionAddPoints"),replaceSection=document.getElementById("replaceSection"),idleWarningBox=document.getElementById("idleWarningBox"),idleCountdownSec=document.getElementById("idleCountdownSec"),btnViewStudents=document.getElementById("btnViewStudents");
   
   let isScanning=!1,isAdminMode=!1,isReplaceMode=!1,currentScannedCardForAdmin="",pendingCardId="",targetReplaceUser=null,autoResetTimer=null,adminIdleTimer=null,adminCountdownInterval=null,countdownSeconds=5,audioCtx=null;
@@ -268,6 +273,8 @@
 
   // 處理讀取到的卡號
   async function handleCardInput(cardId) {
+    // 讀卡機可能只回 9 碼 (前導 0 被吃)，統一補回 10 碼再進入流程
+    cardId = normalizeCardId(cardId);
     // 防連送鎖：有任何刷卡/查詢流程進行中時，忽略新的感應（避免網路延遲下人員重刷造成雲端重複扣點）
     if (isProcessing) {
       if (!isAdminMode) setDisplay(`⏳ <b>系統處理中，請勿重複刷卡...</b><br>（前一次感應尚未完成，本次已忽略）`, "theme-loading");
@@ -683,9 +690,9 @@
         setDisplay(`
           <div style="font-size:26px; color:#00ff66; text-align:center; margin-bottom:8px; font-weight:900;">打卡成功!</div>
           <div style="font-size:20px; text-align:center; color:#00d2ff; margin-bottom:4px;">${n.courseNameOnly || snapshotCourse || activeCourseName}</div>
-          <div style="font-size:28px; text-align:center; margin-bottom:12px; color:#fff; font-weight:bold;">${n.name}</div>
-          <div style="font-size:16px; color:#fff; margin-bottom:4px;">點數 <span class="highlight-val">${n.remainingPoints}</span> 點</div>
-          <div style="font-size:16px; color:#fff; margin-bottom:8px;">使用期限<br><span style="font-size:20px; font-weight:bold; color:#00ff66;">${n.expiryDate}</span></div>
+          <div style="font-size:28px; text-align:center; margin-bottom:12px; color:#fff; font-weight:bold;">${n.name ?? "—"}</div>
+          <div style="font-size:16px; color:#fff; margin-bottom:4px;">點數 <span class="highlight-val">${n.remainingPoints ?? 0}</span> 點</div>
+          <div style="font-size:16px; color:#fff; margin-bottom:8px;">使用期限<br><span style="font-size:20px; font-weight:bold; color:#00ff66;">${n.expiryDate ?? "無期限"}</span></div>
           <div class="history-box">
             <div class="history-title">儲值(開卡)後打卡紀錄:</div>
             ${logsHtml}
