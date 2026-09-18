@@ -229,7 +229,7 @@
   }
   const displayWindow=document.getElementById("displayWindow"),adminPanel=document.getElementById("adminPanel"),adminTargetCard=document.getElementById("adminTargetCard"),cardStatusBadge=document.getElementById("cardStatusBadge"),confirmBox=document.getElementById("confirmBox"),confirmMsg=document.getElementById("confirmMsg"),sectionNewCard=document.getElementById("sectionNewCard"),sectionAddPoints=document.getElementById("sectionAddPoints"),replaceSection=document.getElementById("replaceSection"),idleWarningBox=document.getElementById("idleWarningBox"),idleCountdownSec=document.getElementById("idleCountdownSec"),btnViewStudents=document.getElementById("btnViewStudents");
   
-  let isScanning=!1,isAdminMode=!1,isReplaceMode=!1,currentScannedCardForAdmin="",pendingCardId="",targetReplaceUser=null,autoResetTimer=null,adminIdleTimer=null,adminCountdownInterval=null,countdownSeconds=5,audioCtx=null;
+  let isScanning=!1,isAdminMode=!1,isReplaceMode=!1,currentScannedCardForAdmin="",pendingCardId="",targetReplaceUser=null,autoResetTimer=null,adminIdleTimer=null,adminCountdownInterval=null,countdownSeconds=5,audioCtx=null,resetLocked=!1;
   let activeCourseInfo="",activeCourseName="";
   // 防連送鎖：一次只允許一個進行中的刷卡 / 查詢流程，杜絕網路延遲下人員連續重刷造成的「雲端重複扣點」
   let isProcessing=!1;
@@ -429,7 +429,8 @@
 
   ["click","touchstart","touchmove","mousemove","keydown","scroll"].forEach(t=>{
     window.addEventListener(t,()=>{
-      if(autoResetTimer){ clearTimeout(autoResetTimer); autoResetTimer=null; }
+      // 打卡成功後 10 秒「嚴格倒數」期間：任何操作都不延後，到點必回待打卡
+      if(!resetLocked && autoResetTimer){ clearTimeout(autoResetTimer); autoResetTimer=null; }
       isAdminMode&&resetAdminIdleTimer();
       initAudio(); // 首次使用者動作時解鎖 AudioContext，避免行動裝置首次音效被靜音
     },{passive:!0});
@@ -642,7 +643,10 @@
   function resetAutoResetTimer(timeoutMs = 3000){
     autoResetTimer&&clearTimeout(autoResetTimer);
     if(!isAdminMode){
+      // 打卡成功走 10000ms 嚴格倒數：期間任何操作都不延後，到點必回待打卡
+      resetLocked = (timeoutMs === 10000);
       autoResetTimer=setTimeout(()=>{
+        resetLocked = !1;
         confirmBox.style.display="none";
         pendingCardId="";
         if(isScanning){
@@ -681,8 +685,10 @@
         playSoundSuccess();
 
         let logsHtml = "";
-        if(n.logsAfterRecharge && n.logsAfterRecharge.length > 0){
-          logsHtml = n.logsAfterRecharge.map(item => `<div class="history-item">${item.time}</div>`).join("");
+        // 後端 deduct 成功時回的是 recent5Logs（含當次那筆），改讀它才會顯示本次打卡時間
+        const successLogs = n.recent5Logs && n.recent5Logs.length > 0 ? n.recent5Logs : (n.logsAfterRecharge || []);
+        if (successLogs.length > 0){
+          logsHtml = successLogs.map(item => `<div class="history-item">${typeof item === "string" ? item : item.time}</div>`).join("");
         } else {
           logsHtml = `<div class="history-item" style="color:#aaa;">無紀錄</div>`;
         }
@@ -699,7 +705,7 @@
           </div>
         `, "theme-success");
 
-        resetAutoResetTimer(6000);
+        resetAutoResetTimer(10000);
 
       }else"need_confirm"===n.status?(playSoundError(),pendingCardId=t,confirmMsg.innerHTML=n.message,confirmBox.style.display="block",setDisplay("⚠️ <b>請於下方選擇是否繼續扣點</b>","theme-admin")):"admin"===n.status?(playSoundSuccess(),isAdminMode=!0,resetAdminIdleTimer(),autoResetTimer&&clearTimeout(autoResetTimer),currentScannedCardForAdmin="",adminTargetCard.innerText="請刷卡...",cardStatusBadge.innerText="",sectionNewCard.style.display="none",sectionAddPoints.style.display="none",setDisplay("👑 <b>管理者解鎖！</b><br>已進入管理者模式，<b>簽到扣款已暫停</b>。<br>請刷卡輸入欲處理的會員卡號。","theme-admin"),adminPanel.style.display="block",initMonthDropdown()):(playSoundError(),setDisplay(`❌ <b>打卡失敗：</b><br>${n.message}<br><br>💳 卡號：${t}`,"theme-error"));
       // 若 safeFetch 因逾時/連線失敗回傳 null：畫面已被 safeFetch 顯示錯誤，這裡只負責還原鎖定與（非管理時）回預備狀態
