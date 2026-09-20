@@ -514,7 +514,7 @@
           <td style="text-align:center;">${idx+1}</td>
           <td>${checkMark}<b>${s.name}</b></td>
           <td><a href="tel:${s.phone}" style="color:#00d2ff;">${s.phone || "無"}</a></td>
-          <td><span class="student-tag" style="${s.isWalkIn ? 'background:#d32f2f;color:#fff;' : (s.isTrial ? 'background:#ff9800;color:#fff;' : 'background:#00c853;color:#fff;')}">${s.type}</span></td>
+          <td><span class="student-tag" style="${s.isWalkIn ? 'background:#d32f2f;color:#fff;' : (s.type === "同卡同行" ? 'background:#e040fb;color:#fff;font-weight:800;' : (s.isTrial ? 'background:#ff9800;color:#fff;' : 'background:#00c853;color:#fff;'))}">${s.type === "同卡同行" ? "⚠️ " : ""}${s.type}</span></td>
         </tr>
       `;
     }).join("");
@@ -571,7 +571,7 @@
               <td><b>${course}</b></td>
               <td>${dStr}</td>
               <td><span class="badge-count">${students.length} 人</span></td>
-              <td>${students.map(n => `<span class="student-tag">${n}</span>`).join("")}</td>
+              <td>${students.map(n => `<span class="student-tag" style="${n.includes('[友') ? 'background:#e040fb;color:#fff;font-weight:800;' : ''}">${n}</span>`).join("")}</td>
             </tr>
           `;
         }
@@ -685,8 +685,10 @@
         playSoundSuccess();
 
         let logsHtml = "";
-        // 後端 deduct 成功時回的是 recent5Logs（含當次那筆），改讀它才會顯示本次打卡時間
-        const successLogs = n.recent5Logs && n.recent5Logs.length > 0 ? n.recent5Logs : (n.logsAfterRecharge || []);
+        // 全量：最近一次儲值/開卡之後所有有效簽到紀錄（跨月流水分頁，含當次那筆）
+        const successLogs = (n.allCheckInLogs && n.allCheckInLogs.length > 0)
+          ? n.allCheckInLogs
+          : ((n.recent5Logs && n.recent5Logs.length > 0) ? n.recent5Logs : (n.logsAfterRecharge || []));
         if (successLogs.length > 0){
           logsHtml = successLogs.map(item => `<div class="history-item">${typeof item === "string" ? item : item.time}</div>`).join("");
         } else {
@@ -699,8 +701,8 @@
           <div style="font-size:28px; text-align:center; margin-bottom:12px; color:#fff; font-weight:bold;">${n.name ?? "—"}</div>
           <div style="font-size:16px; color:#fff; margin-bottom:4px;">點數 <span class="highlight-val">${n.remainingPoints ?? 0}</span> 點</div>
           <div style="font-size:16px; color:#fff; margin-bottom:8px;">使用期限<br><span style="font-size:20px; font-weight:bold; color:#00ff66;">${n.expiryDate ?? "無期限"}</span></div>
-          <div class="history-box">
-            <div class="history-title">儲值(開卡)後打卡紀錄:</div>
+          <div class="history-box" style="max-height:220px; overflow-y:auto;">
+            <div class="history-title">儲值(開卡)後打卡紀錄(全部):</div>
             ${logsHtml}
           </div>
         `, "theme-success");
