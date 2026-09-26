@@ -440,7 +440,7 @@
     const res = await safeFetch({action: "getTodayCourses"});
     const container = document.getElementById("courseItemsContainer");
     const todayLabel = document.getElementById("todayLabel");
-    
+
     if(res && res.status === "success"){
       todayLabel.innerText = `${res.todayDay} 課程`;
       if(!res.courses || res.courses.length === 0){
@@ -462,6 +462,15 @@
     } else {
       container.innerHTML = `<div style="color:#ff4d4d;text-align:center;padding:10px;">讀取當日課程失敗</div>`;
     }
+  }
+
+  // 取得今日日期字串 (YYYY/MM/DD)
+  function todayStr() {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const date = String(d.getDate()).padStart(2, '0');
+    return `${year}/${month}/${date}`;
   }
 
   function handleCourseToggle(targetInput){
@@ -498,23 +507,41 @@
   }
 
   function showStudentListModal(courseName, students){
-    document.getElementById("reportTitle").innerHTML = `📋 【${courseName}】上課人員`;
+    document.getElementById("reportTitle").innerHTML = `📋 【${courseName}】上課人員（${todayStr()}）`;
     const reportBody = document.getElementById("reportText");
-    
+
     if (!students || students.length === 0) {
       reportBody.innerHTML = `<div style="text-align:center;padding:30px;color:#aaa;">⚠️ 目前尚無預約或簽到學員</div>`;
       document.getElementById("reportModal").style.display = "flex";
       return;
     }
 
+    function formatTypeDisplay(type) {
+      if (!type) return "-";
+      if (type === "正式報名") return "正式報名";
+      if (type === "現場") return "現場";
+      if (type === "同卡同行") return "同卡同行";
+      // 嘗試解析為日期
+      const d = new Date(type);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const date = String(d.getDate()).padStart(2, '0');
+        return `${year}/${month}/${date}`;
+      }
+      return type;
+    }
+
     let rowsHtml = students.map((s, idx) => {
       const checkMark = s.isCheckedIn ? `<span class="check-icon-blink">✔︎</span>` : ``;
+      const typeDisplay = formatTypeDisplay(s.type);
+      const tagStyle = s.isWalkIn ? 'background:#d32f2f;color:#fff;' : (s.type === "同卡同行" ? 'background:#e040fb;color:#fff;font-weight:800;' : (s.isTrial ? 'background:#ff9800;color:#fff;' : 'background:#00c853;color:#fff;'));
       return `
         <tr>
           <td style="text-align:center;">${idx+1}</td>
           <td>${checkMark}<b>${s.name}</b></td>
           <td><a href="tel:${s.phone}" style="color:#00d2ff;">${s.phone || "無"}</a></td>
-          <td><span class="student-tag" style="${s.isWalkIn ? 'background:#d32f2f;color:#fff;' : (s.type === "同卡同行" ? 'background:#e040fb;color:#fff;font-weight:800;' : (s.isTrial ? 'background:#ff9800;color:#fff;' : 'background:#00c853;color:#fff;'))}">${s.type === "同卡同行" ? "⚠️ " : ""}${s.type}</span></td>
+          <td><span class="student-tag" style="${tagStyle}">${s.type === "同卡同行" ? "⚠️ " : ""}${typeDisplay}</span></td>
         </tr>
       `;
     }).join("");
