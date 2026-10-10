@@ -183,12 +183,10 @@
         <select id="newCardType">
           <option value="一般">一般會員</option>
           <option value="VIP">VIP 會員</option>
-          <option value="體驗">體驗學員</option>
-          <option value="管理者">管理者</option>
         </select>
       </div>
       <div class="form-group">
-        <label>初始點數 (預設 10 點)：</label>
+        <label>初始點數 (一般 10 點、VIP 12 點)：</label>
         <input type="number" id="newCardPoints" value="10">
       </div>
       <div class="form-group">
@@ -201,7 +199,7 @@
     <div id="sectionAddPoints" class="admin-section" style="display:none">
       <h4>🎟️ 點數儲值與展延</h4>
       <div class="form-group">
-        <label>展延到期日 (預設：當前到期日+剩餘天數+100天)：</label>
+        <label>展延到期日 (預設：今日 +100 天)：</label>
         <input type="date" id="addPointExpiry">
       </div>
       <button class="btn-admin-act" style="background:#00c853;margin-bottom:8px" onclick="submitAddPoints(10)">+ 增加 10 點</button>
@@ -233,6 +231,8 @@
   let activeCourseInfo="",activeCourseName="";
   // 防連送鎖：一次只允許一個進行中的刷卡 / 查詢流程，杜絕網路延遲下人員連續重刷造成的「雲端重複扣點」
   let isProcessing=!1;
+  // 追蹤使用者是否手動改過「初始點數」→ 若改過，切換類別時不覆蓋點數
+  let pointsManuallyEdited = false;
 
   // 電腦模擬鍵盤輸入 (刷卡機 / 讀卡機 / 條碼槍) 相關變數
   let keyboardBuffer = "";
@@ -242,12 +242,23 @@
     fetchTodayCourses();
     initMonthDropdown();
     initKeyboardScanListener();
+
+    // 監聽「卡片類別」變更 → 若點數未被手動改過，套用對應預設
+    document.getElementById("newCardType").addEventListener("change", () => {
+      if (pointsManuallyEdited) return;
+      const type = document.getElementById("newCardType").value;
+      document.getElementById("newCardPoints").value = (type === "VIP") ? 12 : 10;
+    });
+
+    // 監聽「初始點數」輸入 → 標記為手動改過
+    document.getElementById("newCardPoints").addEventListener("input", () => {
+      pointsManuallyEdited = true;
+    });
   });
 
   // 全域鍵盤監聽，收集電腦模擬鍵盤輸入的卡號 (預設以 Enter 鍵為結束字元)
   function initKeyboardScanListener() {
     window.addEventListener("keydown", (e) => {
-      // 若使用者正在輸入框內打字（如：搜尋學員姓名、設定日期等），則不攔截
       const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
       if (tag === "input" || tag === "select" || tag === "textarea") {
         return;
@@ -260,10 +271,9 @@
           if (keyboardTimer) { clearTimeout(keyboardTimer); keyboardTimer = null; }
           handleCardInput(scannedCode);
         }
-      } else if (e.key.length === 1) { // 僅收集單一文字/數字字元
+      } else if (e.key.length === 1) {
         keyboardBuffer += e.key;
         if (keyboardTimer) clearTimeout(keyboardTimer);
-        // 若超過 500ms 未繼續輸入則清空緩衝區，避免人工慢速輸入誤觸
         keyboardTimer = setTimeout(() => {
           keyboardBuffer = "";
         }, 500);
@@ -273,9 +283,7 @@
 
   // 處理讀取到的卡號
   async function handleCardInput(cardId) {
-    // 讀卡機可能只回 9 碼 (前導 0 被吃)，統一補回 10 碼再進入流程
     cardId = normalizeCardId(cardId);
-    // 防連送鎖：有任何刷卡/查詢流程進行中時，忽略新的感應（避免網路延遲下人員重刷造成雲端重複扣點）
     if (isProcessing) {
       if (!isAdminMode) setDisplay(`⏳ <b>系統處理中，請勿重複刷卡...</b><br>（前一次感應尚未完成，本次已忽略）`, "theme-loading");
       return;
@@ -299,7 +307,6 @@
       try {
         const t = await safeFetch({ action: "checkCard", cardId: cardId });
         if (!t) {
-          // safeFetch 已顯示逾時/連線錯誤，解除鎖即可，讓人員可重新刷卡重試
           isProcessing = !1;
           return;
         }
@@ -334,6 +341,9 @@
         } else {
           sectionNewCard.style.display = "block";
           sectionAddPoints.style.display = "none";
+          // 重置「手動改過」狀態
+          pointsManuallyEdited = false;
+          document.getElementById("newCardType").value = "一般";
           document.getElementById("newCardPoints").value = 10;
           document.getElementById("newCardExpiry").value = calcFutureDate(100);
           cardStatusBadge.innerText = "✨ 此為全新的空白卡片，可建立新資料";
@@ -429,10 +439,9 @@
 
   ["click","touchstart","touchmove","mousemove","keydown","scroll"].forEach(t=>{
     window.addEventListener(t,()=>{
-      // 打卡成功後 10 秒「嚴格倒數」期間：任何操作都不延後，到點必回待打卡
       if(!resetLocked && autoResetTimer){ clearTimeout(autoResetTimer); autoResetTimer=null; }
       isAdminMode&&resetAdminIdleTimer();
-      initAudio(); // 首次使用者動作時解鎖 AudioContext，避免行動裝置首次音效被靜音
+      initAudio();
     },{passive:!0});
   });
 
@@ -464,7 +473,6 @@
     }
   }
 
-  // 取得今日日期字串 (YYYY/MM/DD)
   function todayStr() {
     const d = new Date();
     const year = d.getFullYear();
@@ -521,7 +529,6 @@
       if (type === "正式報名") return "正式報名";
       if (type === "現場") return "現場";
       if (type === "同卡同行") return "同卡同行";
-      // 嘗試解析為日期
       const d = new Date(type);
       if (!isNaN(d.getTime())) {
         const year = d.getFullYear();
@@ -651,18 +658,9 @@
     return [d.getFullYear(), (""+(d.getMonth()+1)).padStart(2,"0"), (""+d.getDate()).padStart(2,"0")].join("-");
   }
 
+  // 展延到期日：固定「今天 + 100 天」
   function calcRechargeExpiry(rawExpiryStr){
-    const now = new Date();
-    now.setHours(0,0,0,0);
-    let remDays = 0;
-    if(rawExpiryStr){
-      const exp = new Date(rawExpiryStr);
-      if(!isNaN(exp.getTime())){
-        remDays = Math.ceil((exp - now)/(1000*60*60*24));
-      }
-    }
-    if(remDays < 0) remDays = 0;
-    return calcFutureDate(remDays + 100);
+    return calcFutureDate(100);
   }
 
   function setDisplay(t,e){displayWindow.className=`status-display ${e}`,displayWindow.innerHTML=t}
@@ -670,7 +668,6 @@
   function resetAutoResetTimer(timeoutMs = 3000){
     autoResetTimer&&clearTimeout(autoResetTimer);
     if(!isAdminMode){
-      // 打卡成功走 10000ms 嚴格倒數：期間任何操作都不延後，到點必回待打卡
       resetLocked = (timeoutMs === 10000);
       autoResetTimer=setTimeout(()=>{
         resetLocked = !1;
@@ -702,7 +699,6 @@
   }
 
   async function processDeduct(t,e=!1){
-    // 課程快照：在開始處理當下固定課程資訊，避免慢回傳期間人員切換課程開關，導致成功畫面顯示錯課程
     const snapshotCourse = activeCourseInfo || activeCourseName;
     isProcessing = !0;
     confirmBox.style.display="none",setDisplay(`💳 讀取卡號：<b>${t}</b><br>⏳ <b>資料處理中，請勿重複刷卡...</b>`,"theme-loading");
@@ -712,7 +708,6 @@
         playSoundSuccess();
 
         let logsHtml = "";
-        // 全量：最近一次儲值/開卡之後所有有效簽到紀錄（跨月流水分頁，含當次那筆）
         const successLogs = (n.allCheckInLogs && n.allCheckInLogs.length > 0)
           ? n.allCheckInLogs
           : ((n.recent5Logs && n.recent5Logs.length > 0) ? n.recent5Logs : (n.logsAfterRecharge || []));
@@ -737,7 +732,6 @@
         resetAutoResetTimer(10000);
 
       }else"need_confirm"===n.status?(playSoundError(),pendingCardId=t,confirmMsg.innerHTML=n.message,confirmBox.style.display="block",setDisplay("⚠️ <b>請於下方選擇是否繼續扣點</b>","theme-admin")):"admin"===n.status?(playSoundSuccess(),isAdminMode=!0,resetAdminIdleTimer(),autoResetTimer&&clearTimeout(autoResetTimer),currentScannedCardForAdmin="",adminTargetCard.innerText="請刷卡...",cardStatusBadge.innerText="",sectionNewCard.style.display="none",sectionAddPoints.style.display="none",setDisplay("👑 <b>管理者解鎖！</b><br>已進入管理者模式，<b>簽到扣款已暫停</b>。<br>請刷卡輸入欲處理的會員卡號。","theme-admin"),adminPanel.style.display="block",initMonthDropdown()):(playSoundError(),setDisplay(`❌ <b>打卡失敗：</b><br>${n.message}<br><br>💳 卡號：${t}`,"theme-error"));
-      // 若 safeFetch 因逾時/連線失敗回傳 null：畫面已被 safeFetch 顯示錯誤，這裡只負責還原鎖定與（非管理時）回預備狀態
       if(!n){
         if(!isAdminMode){
           if(isScanning){
