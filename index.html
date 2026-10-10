@@ -27,6 +27,46 @@
     .theme-admin{background-color:#4a0072;color:#e040fb;border:3px solid #e040fb}
     .highlight-val{font-size:28px;font-weight:900;color:#fff}
 
+    /* ===== 警示樣式 ===== */
+    .warn-text {
+      color: #ff3333;
+      font-weight: 900;
+      font-size: 1.6em;
+      animation: blink-warn 1s infinite alternate;
+      text-shadow: 0 0 8px rgba(255, 51, 51, 0.8);
+    }
+    @keyframes blink-warn {
+      0% { opacity: 1; }
+      100% { opacity: 0.45; }
+    }
+    .expired-badge {
+      display: inline-block;
+      background: #dc2626;
+      color: #fff;
+      font-size: 1.35em;
+      font-weight: 900;
+      padding: 6px 14px;
+      border-radius: 8px;
+      animation: blink-warn 1s infinite alternate;
+      box-shadow: 0 0 20px rgba(220, 38, 38, 0.8);
+      margin: 0 4px;
+    }
+    .expired-date-strike {
+      text-decoration: line-through;
+      color: #888;
+      font-size: 0.85em;
+    }
+    .expiry-hint {
+      color: #ff3333;
+      font-weight: 700;
+      font-size: 0.9em;
+    }
+    .points-hint {
+      color: #ff3333;
+      font-weight: 700;
+      font-size: 0.85em;
+    }
+
     .check-icon-blink {
       color: #ff3333;
       font-weight: 900;
@@ -204,6 +244,16 @@
       </div>
       <button class="btn-admin-act" style="background:#00c853;margin-bottom:8px" onclick="submitAddPoints(10)">+ 增加 10 點</button>
       <button class="btn-admin-act" style="background:#00b0ff;margin-bottom:12px" onclick="submitAddPoints(12)">+ 增加 12 點</button>
+
+      <!-- 手動輸入點數 -->
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>手動輸入點數 (1~1000)：</label>
+        <div style="display:flex;gap:8px;">
+          <input type="number" id="customAddPoints" placeholder="輸入點數" min="1" max="1000" style="flex:1;">
+          <button class="btn-admin-act" style="width:auto;margin-top:0;padding:0 20px;background:#00c853;" onclick="submitCustomAddPoints()">確認加值</button>
+        </div>
+      </div>
+
       <div class="switch-container">
         <span style="font-size:14px;color:#ff8a80;font-weight:700">解鎖刪除卡片功能：</span>
         <label class="switch">
@@ -220,7 +270,6 @@
 
 <script>
   const GAS_WEB_APP_URL="https://script.google.com/macros/s/AKfycbxJBj6m1rNfyzwdY0jXtdSFDo3v6gNJcW97kykne3Au_zJiVHRwGcVcEFqDeal9kZp8EQ/exec";
-  // 讀卡機回傳卡號兜底：純數字卡號一律補回 10 碼 (前導 0)，杜絕 0840269854 被讀成 840269854 查無卡號
   function normalizeCardId(code){
     const s=String(code||"").trim().toUpperCase();
     return /^\d{1,9}$/.test(s)?s.padStart(10,"0"):s;
@@ -229,34 +278,63 @@
   
   let isScanning=!1,isAdminMode=!1,isReplaceMode=!1,currentScannedCardForAdmin="",pendingCardId="",targetReplaceUser=null,autoResetTimer=null,adminIdleTimer=null,adminCountdownInterval=null,countdownSeconds=5,audioCtx=null,resetLocked=!1;
   let activeCourseInfo="",activeCourseName="";
-  // 防連送鎖：一次只允許一個進行中的刷卡 / 查詢流程，杜絕網路延遲下人員連續重刷造成的「雲端重複扣點」
   let isProcessing=!1;
-  // 追蹤使用者是否手動改過「初始點數」→ 若改過，切換類別時不覆蓋點數
   let pointsManuallyEdited = false;
 
-  // 電腦模擬鍵盤輸入 (刷卡機 / 讀卡機 / 條碼槍) 相關變數
   let keyboardBuffer = "";
   let keyboardTimer = null;
+
+  // ===== 警示輔助函式 =====
+  // 計算到期日剩餘天數（回傳 null 表示無期限/無效）
+  function calcDaysUntilExpiry(expiryDateStr){
+    if(!expiryDateStr) return null;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const exp = new Date(expiryDateStr);
+    if(isNaN(exp.getTime())) return null;
+    exp.setHours(0,0,0,0);
+    return Math.ceil((exp - today) / (1000*60*60*24));
+  }
+
+  // 產生「使用期限」警示 HTML
+  function buildExpiryHtml(expiryDateStr){
+    if(!expiryDateStr || expiryDateStr === "無期限") return "無期限";
+    const days = calcDaysUntilExpiry(expiryDateStr);
+    if(days === null) return expiryDateStr;
+    if(days < 0){
+      return `<span class="expired-badge">⚠️ 已過期</span> <span class="expired-date-strike">${expiryDateStr}</span>`;
+    }
+    if(days < 20){
+      return `<span class="warn-text">${expiryDateStr}</span> <span class="expiry-hint">（剩 ${days} 天）</span>`;
+    }
+    return expiryDateStr;
+  }
+
+  // 產生「剩餘點數」警示 HTML
+  function buildPointsHtml(points){
+    const p = Number(points) || 0;
+    if(p <= 2){
+      return `<span class="warn-text">${p}</span> <span class="points-hint">點（即將用完）</span>`;
+    }
+    return `<b>${p}</b> 點`;
+  }
 
   window.addEventListener("DOMContentLoaded", ()=>{
     fetchTodayCourses();
     initMonthDropdown();
     initKeyboardScanListener();
 
-    // 監聽「卡片類別」變更 → 若點數未被手動改過，套用對應預設
     document.getElementById("newCardType").addEventListener("change", () => {
       if (pointsManuallyEdited) return;
       const type = document.getElementById("newCardType").value;
       document.getElementById("newCardPoints").value = (type === "VIP") ? 12 : 10;
     });
 
-    // 監聽「初始點數」輸入 → 標記為手動改過
     document.getElementById("newCardPoints").addEventListener("input", () => {
       pointsManuallyEdited = true;
     });
   });
 
-  // 全域鍵盤監聽，收集電腦模擬鍵盤輸入的卡號 (預設以 Enter 鍵為結束字元)
   function initKeyboardScanListener() {
     window.addEventListener("keydown", (e) => {
       const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
@@ -281,7 +359,6 @@
     });
   }
 
-  // 處理讀取到的卡號
   async function handleCardInput(cardId) {
     cardId = normalizeCardId(cardId);
     if (isProcessing) {
@@ -315,10 +392,15 @@
           sectionAddPoints.style.display = "block";
           const e = calcRechargeExpiry(t.expiryDate);
           document.getElementById("addPointExpiry").value = e;
-          
-          let isLockedHint = t.isLocked ? " <span style='color:#ff4d4d;'>(⚠️ 已鎖卡)</span>" : "";
-          cardStatusBadge.innerHTML = `⚠️ 既有學員：${t.name}（剩餘 ${t.points} 點，原到期日 ${t.expiryDate || "無"}）${isLockedHint}`;
-          
+          // 重置手動輸入欄
+          const customInput = document.getElementById("customAddPoints");
+          if (customInput) customInput.value = "";
+
+          const pointsHtml = buildPointsHtml(t.points);
+          const expiryHtml = buildExpiryHtml(t.expiryDate);
+
+          cardStatusBadge.innerHTML = `⚠️ 既有學員：${t.name}（剩餘 ${t.points} 點，原到期日 ${t.expiryDate || "無"}）`;
+
           let n = "";
           n = t.logsAfterRecharge && t.logsAfterRecharge.length > 0 
             ? t.logsAfterRecharge.map((item => `<div class="history-item">🕒 ${item.time}</div>`)).join("") 
@@ -327,8 +409,8 @@
           setDisplay(`
             <div style="text-align: center;">
               姓名：<b>${t.name}</b><br>
-              點數：<b>${t.points}</b> 點<br>
-              使用期限：${t.expiryDate || "無期限"}${t.isLocked ? " (已鎖卡)" : ""}
+              點數：${pointsHtml}<br>
+              使用期限：${expiryHtml}
             </div>
             <div class="history-box" style="margin-top:15px; text-align:left; max-height:160px; overflow-y:auto;">
               <div class="history-title" style="color:#00d2ff;">💰 最近一次儲值/開卡時間：</div>
@@ -341,7 +423,6 @@
         } else {
           sectionNewCard.style.display = "block";
           sectionAddPoints.style.display = "none";
-          // 重置「手動改過」狀態
           pointsManuallyEdited = false;
           document.getElementById("newCardType").value = "一般";
           document.getElementById("newCardPoints").value = 10;
@@ -658,7 +739,6 @@
     return [d.getFullYear(), (""+(d.getMonth()+1)).padStart(2,"0"), (""+d.getDate()).padStart(2,"0")].join("-");
   }
 
-  // 展延到期日：固定「今天 + 100 天」
   function calcRechargeExpiry(rawExpiryStr){
     return calcFutureDate(100);
   }
@@ -717,12 +797,32 @@
           logsHtml = `<div class="history-item" style="color:#aaa;">無紀錄</div>`;
         }
 
+        // 警示：使用期限、剩餘點數
+        const remaining = n.remainingPoints ?? 0;
+        const expiry = n.expiryDate ?? "無期限";
+        const pointsHtml = buildPointsHtml(remaining);
+        const expiryHtml = buildExpiryHtml(expiry);
+        const daysLeft = calcDaysUntilExpiry(expiry);
+        const expired = (daysLeft !== null && daysLeft < 0);
+
+        // 額外警示文字
+        let warningBanner = "";
+        const warnItems = [];
+        if (remaining <= 2) warnItems.push("⚠️ 點數即將用完");
+        if (expired) warnItems.push("⚠️ 卡片已過期");
+        else if (daysLeft !== null && daysLeft < 20) warnItems.push("⚠️ 期限即將到期");
+
+        if (warnItems.length > 0) {
+          warningBanner = `<div style="margin-top:10px; padding:8px; background:rgba(220,38,38,0.25); border:2px solid #dc2626; border-radius:8px; text-align:center; color:#ff8888; font-weight:900; font-size:1.05em; animation:blink-warn 1s infinite alternate;">${warnItems.join("<br>")}</div>`;
+        }
+
         setDisplay(`
           <div style="font-size:26px; color:#00ff66; text-align:center; margin-bottom:8px; font-weight:900;">打卡成功!</div>
           <div style="font-size:20px; text-align:center; color:#00d2ff; margin-bottom:4px;">${n.courseNameOnly || snapshotCourse || activeCourseName}</div>
           <div style="font-size:28px; text-align:center; margin-bottom:12px; color:#fff; font-weight:bold;">${n.name ?? "—"}</div>
-          <div style="font-size:16px; color:#fff; margin-bottom:4px;">點數 <span class="highlight-val">${n.remainingPoints ?? 0}</span> 點</div>
-          <div style="font-size:16px; color:#fff; margin-bottom:8px;">使用期限<br><span style="font-size:20px; font-weight:bold; color:#00ff66;">${n.expiryDate ?? "無期限"}</span></div>
+          <div style="font-size:16px; color:#fff; margin-bottom:4px;">點數 ${pointsHtml}</div>
+          <div style="font-size:16px; color:#fff; margin-bottom:8px;">使用期限<br><span style="font-size:20px; font-weight:bold;">${expiryHtml}</span></div>
+          ${warningBanner}
           <div class="history-box" style="max-height:220px; overflow-y:auto;">
             <div class="history-title">儲值(開卡)後打卡紀錄(全部):</div>
             ${logsHtml}
@@ -786,6 +886,34 @@
       setDisplay("⏳ 點數儲值中...","theme-loading");
       const n=await safeFetch({action:"addPoints",cardId:currentScannedCardForAdmin,addPointsAmount:t,expiryDate:e});
       n&&(alert(n.message),"success"===n.status?(playSoundSuccess(),adminTargetCard.innerText="請刷卡讀取下張卡片...",cardStatusBadge.innerText="",sectionAddPoints.style.display="none",setDisplay("👑 <b>加點成功！</b><br>可繼續刷卡讀取下一張卡片。","theme-admin")):playSoundError())
+    }
+  }
+
+  // 手動輸入點數加值
+  async function submitCustomAddPoints(){
+    if(!currentScannedCardForAdmin)return alert("請先刷卡讀取要加點的會員卡片！");
+    const inputEl = document.getElementById("customAddPoints");
+    const n = Number(inputEl.value);
+    if(isNaN(n) || n <= 0 || n > 1000 || Math.floor(n) !== n){
+      return alert("請輸入 1~1000 的正整數！");
+    }
+    const e = document.getElementById("addPointExpiry").value;
+    if(confirm(`確定要為卡號 ${currentScannedCardForAdmin} 增加 ${n} 點，並設定到期日為 ${e} 嗎？`)){
+      setDisplay("⏳ 點數儲值中...","theme-loading");
+      const res = await safeFetch({action:"addPoints",cardId:currentScannedCardForAdmin,addPointsAmount:n,expiryDate:e});
+      if(res){
+        alert(res.message);
+        if(res.status === "success"){
+          playSoundSuccess();
+          inputEl.value = "";
+          adminTargetCard.innerText = "請刷卡讀取下張卡片...";
+          cardStatusBadge.innerText = "";
+          sectionAddPoints.style.display = "none";
+          setDisplay("👑 <b>加點成功！</b><br>可繼續刷卡讀取下一張卡片。","theme-admin");
+        } else {
+          playSoundError();
+        }
+      }
     }
   }
 
