@@ -498,7 +498,7 @@
       adminIdleTimer&&clearTimeout(adminIdleTimer);
       adminCountdownInterval&&clearInterval(adminCountdownInterval);
       idleWarningBox.style.display="none";
-      adminIdleTimer=setTimeout(()=>{startIdleCountdown()}, 20000);
+      adminIdleTimer=setTimeout(()=>{startIdleCountdown()}, 40000);
     }
   }
 
@@ -513,7 +513,7 @@
         clearInterval(adminCountdownInterval);
         idleWarningBox.style.display="none";
         closeAdminPanel();
-        alert("⏱️ 管理者模式已超過 25 秒未操作，系統已自動退出！");
+        alert("⏱️ 管理者模式已超過 45 秒未操作，系統已自動退出！");
       }
     },1000);
   }
