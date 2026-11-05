@@ -11,7 +11,27 @@
     
     .course-list-box{background:#2a2a2a;border:1px solid #444;border-radius:12px;padding:12px;margin:15px 0;text-align:left}
     .course-list-title{font-size:16px;font-weight:700;color:#00d2ff;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
-    .course-item{display:flex;align-items:center;justify-content:space-between;background:#181818;padding:10px 12px;border-radius:8px;margin-bottom:8px;border:1px solid #333}
+    .course-item{display:flex;align-items:center;justify-content:space-between;background:#181818;padding:10px 12px;border-radius:8px;margin-bottom:8px;border:1px solid #333;transition:all 0.3s ease}
+    /* 自動開啟的課程醒目樣式 */
+    .course-item.active-course {
+      border: 2px solid #00ff66 !important;
+      box-shadow: 0 0 15px rgba(0, 255, 102, 0.6);
+      background: #1a2e1a;
+      animation: active-pulse 1.5s ease-in-out infinite;
+    }
+    .course-item.active-course .course-name {
+      font-size: 18px !important;
+      color: #00ff66 !important;
+      text-shadow: 0 0 8px rgba(0, 255, 102, 0.5);
+    }
+    .course-item.active-course .course-sub {
+      font-size: 14px !important;
+      color: #a0ffa0 !important;
+    }
+    @keyframes active-pulse {
+      0%, 100% { box-shadow: 0 0 15px rgba(0, 255, 102, 0.6); }
+      50% { box-shadow: 0 0 25px rgba(0, 255, 102, 0.9); }
+    }
     .course-info-text{font-size:14px;line-height:1.3;flex:1;padding-right:10px}
     .course-name{font-weight:bold;color:#fff;font-size:15px}
     .course-sub{font-size:12px;color:#aaa}
@@ -189,7 +209,7 @@
         <button class="btn-admin-act btn-info" style="margin-top:0;width:auto;padding:8px 15px;" onclick="triggerMonthlySettlement()">📊 月份結算</button>
       </div>
 
-      <button class="btn-admin-act btn-info" style="margin-top:8px;" onclick="fetchRecentLogs()">📋 查詢 1 小時內簽到名單</button>
+      <button id="btnViewTodayLogs" class="btn-admin-act btn-info" style="margin-top:8px;" onclick="fetchTodayCourseLogs()">📋 查詢今日簽到名單</button>
       <div id="recentLogsContainer" style="display:none;margin-top:10px">
         <div id="recentLogsList" class="log-list"></div>
       </div>
@@ -274,7 +294,7 @@
     const s=String(code||"").trim().toUpperCase();
     return /^\d{1,9}$/.test(s)?s.padStart(10,"0"):s;
   }
-  const displayWindow=document.getElementById("displayWindow"),adminPanel=document.getElementById("adminPanel"),adminTargetCard=document.getElementById("adminTargetCard"),cardStatusBadge=document.getElementById("cardStatusBadge"),confirmBox=document.getElementById("confirmBox"),confirmMsg=document.getElementById("confirmMsg"),sectionNewCard=document.getElementById("sectionNewCard"),sectionAddPoints=document.getElementById("sectionAddPoints"),replaceSection=document.getElementById("replaceSection"),idleWarningBox=document.getElementById("idleWarningBox"),idleCountdownSec=document.getElementById("idleCountdownSec"),btnViewStudents=document.getElementById("btnViewStudents");
+  const displayWindow=document.getElementById("displayWindow"),adminPanel=document.getElementById("adminPanel"),adminTargetCard=document.getElementById("adminTargetCard"),cardStatusBadge=document.getElementById("cardStatusBadge"),confirmBox=document.getElementById("confirmBox"),confirmMsg=document.getElementById("confirmMsg"),sectionNewCard=document.getElementById("sectionNewCard"),sectionAddPoints=document.getElementById("sectionAddPoints"),replaceSection=document.getElementById("replaceSection"),idleWarningBox=document.getElementById("idleWarningBox"),idleCountdownSec=document.getElementById("idleCountdownSec"),btnViewStudents=document.getElementById("btnViewStudents"),btnViewTodayLogs=document.getElementById("btnViewTodayLogs");
   
   let isScanning=!1,isAdminMode=!1,isReplaceMode=!1,currentScannedCardForAdmin="",pendingCardId="",targetReplaceUser=null,autoResetTimer=null,adminIdleTimer=null,adminCountdownInterval=null,countdownSeconds=5,audioCtx=null,resetLocked=!1;
   let activeCourseInfo="",activeCourseName="";
@@ -285,7 +305,6 @@
   let keyboardTimer = null;
 
   // ===== 警示輔助函式 =====
-  // 計算到期日剩餘天數（回傳 null 表示無期限/無效）
   function calcDaysUntilExpiry(expiryDateStr){
     if(!expiryDateStr) return null;
     const today = new Date();
@@ -296,7 +315,6 @@
     return Math.ceil((exp - today) / (1000*60*60*24));
   }
 
-  // 產生「使用期限」警示 HTML
   function buildExpiryHtml(expiryDateStr){
     if(!expiryDateStr || expiryDateStr === "無期限") return "無期限";
     const days = calcDaysUntilExpiry(expiryDateStr);
@@ -310,7 +328,6 @@
     return expiryDateStr;
   }
 
-  // 產生「剩餘點數」警示 HTML
   function buildPointsHtml(points){
     const p = Number(points) || 0;
     if(p <= 2){
@@ -387,12 +404,19 @@
           isProcessing = !1;
           return;
         }
+
+        // 親友卡禁止管理者操作
+        if ("friend_card_error" === t.status) {
+          setDisplay(`❌ <b>親友卡不支援管理者操作</b><br>請直接使用一般打卡流程`, "theme-error");
+          playSoundError();
+          return;
+        }
+
         if ("exists" === t.status) {
           sectionNewCard.style.display = "none";
           sectionAddPoints.style.display = "block";
           const e = calcRechargeExpiry(t.expiryDate);
           document.getElementById("addPointExpiry").value = e;
-          // 重置手動輸入欄
           const customInput = document.getElementById("customAddPoints");
           if (customInput) customInput.value = "";
 
@@ -549,6 +573,13 @@
           </label>
         </div>
       `).join("");
+
+      // 自動開啟第一堂課
+      const firstToggle = container.querySelector(".course-toggle-btn");
+      if (firstToggle) {
+        firstToggle.checked = true;
+        handleCourseToggle(firstToggle);
+      }
     } else {
       container.innerHTML = `<div style="color:#ff4d4d;text-align:center;padding:10px;">讀取當日課程失敗</div>`;
     }
@@ -564,20 +595,37 @@
 
   function handleCourseToggle(targetInput){
     const toggles = document.querySelectorAll(".course-toggle-btn");
+
+    // 清除所有課程的 active 樣式
+    document.querySelectorAll(".course-item").forEach(item => {
+      item.classList.remove("active-course");
+    });
+
     if(targetInput.checked){
       toggles.forEach(input => { if(input !== targetInput) input.checked = false; });
+
+      // 加上 active 樣式
+      targetInput.closest(".course-item").classList.add("active-course");
+
       activeCourseInfo = targetInput.getAttribute("data-info");
       activeCourseName = targetInput.getAttribute("data-name");
-      
+
       btnViewStudents.innerText = `📋 查看【${activeCourseName}】上課人員名單`;
       btnViewStudents.style.display = "block";
-      
+
+      if (btnViewTodayLogs) {
+        btnViewTodayLogs.innerText = `📋 查詢【${activeCourseName}】今日簽到名單`;
+      }
+
       isScanning = !0;
       setDisplay(`💻 請使用電腦刷卡機輸入卡號簽到【${activeCourseInfo}】...`, "theme-waiting");
     } else {
       activeCourseInfo = "";
       activeCourseName = "";
       btnViewStudents.style.display = "none";
+      if (btnViewTodayLogs) {
+        btnViewTodayLogs.innerText = `📋 查詢今日簽到名單`;
+      }
       isScanning = !1;
       setDisplay("已關閉簽到感應。請現場人員開啟欲簽到課程之開關。", "theme-standby");
     }
@@ -592,6 +640,41 @@
       setDisplay(`💻 請使用電腦刷卡機輸入卡號簽到【${activeCourseInfo}】...`, "theme-waiting");
     } else {
       alert(res ? res.message : "讀取學員名單失敗");
+    }
+  }
+
+  // 查詢該堂當日簽到名單
+  async function fetchTodayCourseLogs(){
+    if(!activeCourseName){
+      alert("請先開啟課程開關！");
+      return;
+    }
+    const t=document.getElementById("recentLogsContainer"), e=document.getElementById("recentLogsList");
+    e.innerHTML="載入中...", t.style.display="block";
+    const n=await safeFetch({action:"getCourseTodayLogs", courseName: activeCourseName});
+    if (n && "success" === n.status) {
+      playSoundSuccess();
+      if (0 === n.logs.length) {
+        e.innerHTML = `<div style='color:#aaa; text-align:center;'>今日【${activeCourseName}】尚無學員簽到</div>`;
+      } else {
+        e.innerHTML = n.logs.map((item) => {
+          const cancelled = item.note.includes("已取消");
+          return `
+            <div class="log-item">
+              <div>
+                <span>⏰ ${item.time} - <b>${item.name}</b></span>
+                <div style="font-size:12px; color:${cancelled?"#ff4d4d":"#888"};">${item.note||"已簽到"}</div>
+              </div>
+              <div>
+                ${cancelled ? '<span style="color:#aaa; font-size:12px;">(已取消)</span>' 
+                            : `<button class="btn-refund" onclick="cancelCheckIn('${item.cardId}', '${item.name}', '${item.fullTime}')">↩️ 取消簽到</button>`}
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+    } else {
+      playSoundError();
     }
   }
 
@@ -787,49 +870,57 @@
       if(n)if("success"===n.status){
         playSoundSuccess();
 
-        let logsHtml = "";
-        const successLogs = (n.allCheckInLogs && n.allCheckInLogs.length > 0)
-          ? n.allCheckInLogs
-          : ((n.recent5Logs && n.recent5Logs.length > 0) ? n.recent5Logs : (n.logsAfterRecharge || []));
-        if (successLogs.length > 0){
-          logsHtml = successLogs.map(item => `<div class="history-item">${typeof item === "string" ? item : item.time}</div>`).join("");
+        // 親友卡：僅顯示「打卡成功！」+ 姓名
+        if (n.isFriendCard) {
+          setDisplay(`
+            <div style="font-size:28px; color:#00ff66; text-align:center; margin-bottom:16px; font-weight:900;">打卡成功!</div>
+            <div style="font-size:32px; text-align:center; color:#fff; font-weight:bold;">${n.name ?? "—"}</div>
+          `, "theme-success");
+          resetAutoResetTimer(10000);
         } else {
-          logsHtml = `<div class="history-item" style="color:#aaa;">無紀錄</div>`;
+          // 一般卡：完整顯示
+          let logsHtml = "";
+          const successLogs = (n.allCheckInLogs && n.allCheckInLogs.length > 0)
+            ? n.allCheckInLogs
+            : ((n.recent5Logs && n.recent5Logs.length > 0) ? n.recent5Logs : (n.logsAfterRecharge || []));
+          if (successLogs.length > 0){
+            logsHtml = successLogs.map(item => `<div class="history-item">${typeof item === "string" ? item : item.time}</div>`).join("");
+          } else {
+            logsHtml = `<div class="history-item" style="color:#aaa;">無紀錄</div>`;
+          }
+
+          const remaining = n.remainingPoints ?? 0;
+          const expiry = n.expiryDate ?? "無期限";
+          const pointsHtml = buildPointsHtml(remaining);
+          const expiryHtml = buildExpiryHtml(expiry);
+          const daysLeft = calcDaysUntilExpiry(expiry);
+          const expired = (daysLeft !== null && daysLeft < 0);
+
+          let warningBanner = "";
+          const warnItems = [];
+          if (remaining <= 2) warnItems.push("⚠️ 點數即將用完");
+          if (expired) warnItems.push("⚠️ 卡片已過期");
+          else if (daysLeft !== null && daysLeft < 20) warnItems.push("⚠️ 期限即將到期");
+
+          if (warnItems.length > 0) {
+            warningBanner = `<div style="margin-top:10px; padding:8px; background:rgba(220,38,38,0.25); border:2px solid #dc2626; border-radius:8px; text-align:center; color:#ff8888; font-weight:900; font-size:1.05em; animation:blink-warn 1s infinite alternate;">${warnItems.join("<br>")}</div>`;
+          }
+
+          setDisplay(`
+            <div style="font-size:26px; color:#00ff66; text-align:center; margin-bottom:8px; font-weight:900;">打卡成功!</div>
+            <div style="font-size:20px; text-align:center; color:#00d2ff; margin-bottom:4px;">${n.courseNameOnly || snapshotCourse || activeCourseName}</div>
+            <div style="font-size:28px; text-align:center; margin-bottom:12px; color:#fff; font-weight:bold;">${n.name ?? "—"}</div>
+            <div style="font-size:16px; color:#fff; margin-bottom:4px;">點數 ${pointsHtml}</div>
+            <div style="font-size:16px; color:#fff; margin-bottom:8px;">使用期限<br><span style="font-size:20px; font-weight:bold;">${expiryHtml}</span></div>
+            ${warningBanner}
+            <div class="history-box" style="max-height:220px; overflow-y:auto;">
+              <div class="history-title">儲值(開卡)後打卡紀錄(全部):</div>
+              ${logsHtml}
+            </div>
+          `, "theme-success");
+
+          resetAutoResetTimer(10000);
         }
-
-        // 警示：使用期限、剩餘點數
-        const remaining = n.remainingPoints ?? 0;
-        const expiry = n.expiryDate ?? "無期限";
-        const pointsHtml = buildPointsHtml(remaining);
-        const expiryHtml = buildExpiryHtml(expiry);
-        const daysLeft = calcDaysUntilExpiry(expiry);
-        const expired = (daysLeft !== null && daysLeft < 0);
-
-        // 額外警示文字
-        let warningBanner = "";
-        const warnItems = [];
-        if (remaining <= 2) warnItems.push("⚠️ 點數即將用完");
-        if (expired) warnItems.push("⚠️ 卡片已過期");
-        else if (daysLeft !== null && daysLeft < 20) warnItems.push("⚠️ 期限即將到期");
-
-        if (warnItems.length > 0) {
-          warningBanner = `<div style="margin-top:10px; padding:8px; background:rgba(220,38,38,0.25); border:2px solid #dc2626; border-radius:8px; text-align:center; color:#ff8888; font-weight:900; font-size:1.05em; animation:blink-warn 1s infinite alternate;">${warnItems.join("<br>")}</div>`;
-        }
-
-        setDisplay(`
-          <div style="font-size:26px; color:#00ff66; text-align:center; margin-bottom:8px; font-weight:900;">打卡成功!</div>
-          <div style="font-size:20px; text-align:center; color:#00d2ff; margin-bottom:4px;">${n.courseNameOnly || snapshotCourse || activeCourseName}</div>
-          <div style="font-size:28px; text-align:center; margin-bottom:12px; color:#fff; font-weight:bold;">${n.name ?? "—"}</div>
-          <div style="font-size:16px; color:#fff; margin-bottom:4px;">點數 ${pointsHtml}</div>
-          <div style="font-size:16px; color:#fff; margin-bottom:8px;">使用期限<br><span style="font-size:20px; font-weight:bold;">${expiryHtml}</span></div>
-          ${warningBanner}
-          <div class="history-box" style="max-height:220px; overflow-y:auto;">
-            <div class="history-title">儲值(開卡)後打卡紀錄(全部):</div>
-            ${logsHtml}
-          </div>
-        `, "theme-success");
-
-        resetAutoResetTimer(10000);
 
       }else"need_confirm"===n.status?(playSoundError(),pendingCardId=t,confirmMsg.innerHTML=n.message,confirmBox.style.display="block",setDisplay("⚠️ <b>請於下方選擇是否繼續扣點</b>","theme-admin")):"admin"===n.status?(playSoundSuccess(),isAdminMode=!0,resetAdminIdleTimer(),autoResetTimer&&clearTimeout(autoResetTimer),currentScannedCardForAdmin="",adminTargetCard.innerText="請刷卡...",cardStatusBadge.innerText="",sectionNewCard.style.display="none",sectionAddPoints.style.display="none",setDisplay("👑 <b>管理者解鎖！</b><br>已進入管理者模式，<b>簽到扣款已暫停</b>。<br>請刷卡輸入欲處理的會員卡號。","theme-admin"),adminPanel.style.display="block",initMonthDropdown()):(playSoundError(),setDisplay(`❌ <b>打卡失敗：</b><br>${n.message}<br><br>💳 卡號：${t}`,"theme-error"));
       if(!n){
@@ -889,7 +980,6 @@
     }
   }
 
-  // 手動輸入點數加值
   async function submitCustomAddPoints(){
     if(!currentScannedCardForAdmin)return alert("請先刷卡讀取要加點的會員卡片！");
     const inputEl = document.getElementById("customAddPoints");
@@ -928,31 +1018,11 @@
     }
   }
 
-  async function fetchRecentLogs(){
-    const t=document.getElementById("recentLogsContainer"),e=document.getElementById("recentLogsList");
-    e.innerHTML="載入中...",t.style.display="block";
-    const n=await safeFetch({action:"getRecentLogs"});
-    n&&"success"===n.status?(playSoundSuccess(),0===n.logs.length?e.innerHTML="<div style='color:#aaa; text-align:center;'>過去 1 小時內無學員簽到紀錄</div>":e.innerHTML=n.logs.map((t=>{
-      const e=t.note.includes("已取消");
-      return`
-        <div class="log-item">
-          <div>
-            <span>⏰ ${t.time} - <b>${t.name}</b></span>
-            <div style="font-size:12px; color:${e?"#ff4d4d":"#888"};">${t.note||"已簽到"}</div>
-          </div>
-          <div>
-            ${e?'<span style="color:#aaa; font-size:12px;">(已退點)</span>':`<button class="btn-refund" onclick="cancelCheckIn('${t.cardId}', '${t.name}', '${t.fullTime}')">↩️ 取消簽到退點</button>`}
-          </div>
-        </div>
-      `
-    })).join("")):playSoundError()
-  }
-
   async function cancelCheckIn(t,e,lTime){
-    if(confirm(`確定要為【${e}】取消於 ${lTime} 的簽到並退回 1 點嗎？`)){
+    if(confirm(`確定要為【${e}】取消於 ${lTime} 的簽到嗎？`)){
       setDisplay("⏳ 取消簽到中...","theme-loading");
       const n=await safeFetch({action:"cancelCheckIn",cardId:t,name:e,logTimeStr:lTime,courseInfo:activeCourseInfo});
-      n&&"success"===n.status?(playSoundSuccess(),alert(n.message),fetchRecentLogs(),setDisplay("👑 <b>已成功取消簽到退點！</b>","theme-admin")):(playSoundError(),alert(n?n.message:"取消簽到失敗"))
+      n&&"success"===n.status?(playSoundSuccess(),alert(n.message),fetchTodayCourseLogs(),setDisplay("👑 <b>已成功取消簽到！</b>","theme-admin")):(playSoundError(),alert(n?n.message:"取消簽到失敗"))
     }
   }
 </script>
